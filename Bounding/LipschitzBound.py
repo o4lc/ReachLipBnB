@@ -5,7 +5,12 @@ import torch
 import torch.nn as nn
 
 
-def upperBoundWithLipschitz(network, queryCoefficient, inputLowerBound, inputUpperBound, device):
+def upperBoundWithLipschitz(network: nn.Module,
+                            queryCoefficient: torch.Tensor,
+                            inputLowerBound: torch.Tensor,
+                            inputUpperBound: torch.Tensor,
+                            device=torch.device("cuda", 0)):
+
     weights = extractWeightsFromNetwork(network)
     dMatrix = torch.diag(torch.tensor(2., device=device) / (inputUpperBound - inputLowerBound))
     weights[0] = weights[0] @ dMatrix
@@ -41,7 +46,6 @@ def calculateLipschitzConstant(weights: List[np.ndarray],
 
 
 def extractWeightsFromNetwork(network: nn.Module):
-
     weights = []
     for name, param in network.named_parameters():
         if "weight" in name:
