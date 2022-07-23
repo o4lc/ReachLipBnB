@@ -1,13 +1,13 @@
 from packages import *
 
-Q =  np.array([[2, 0], [0, 1]])
+# Q =  np.array([[2, 0], [0, 1]])
 
-def fx(x, pkg=np):
-    if pkg==np:
-        cost = 0.5 * x.T @ Q @ x
-    else:
-        cost = 0.5 * pkg.t(x) @ pkg.from_numpy(Q.astype('float')).float() @ x
-    return cost
+# def fx(x, pkg=np):
+#     if pkg==np:
+#         cost = 0.5 * x.T @ Q @ x
+#     else:
+#         cost = 0.5 * pkg.t(x) @ pkg.from_numpy(Q.astype('float')).float() @ x
+#     return cost
 
 # Needed for Jacobian Calculations
 # def expression_reducer(x):
@@ -20,9 +20,10 @@ def plot_space(space, l, u):
     plt.rcParams["figure.autolayout"] = True
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    rectangle = patches.Rectangle((l[0], l[1]), u[0], u[1], edgecolor=None, facecolor="grey", linewidth=7, alpha=0.5)
+    rectangle = patches.Rectangle((l[0], l[1]), u[0] - l[0], u[1] - l[1], edgecolor=None, facecolor="grey", linewidth=7, alpha=0.5)
     ax.add_patch(rectangle)
 
+    print(space)
     for node in space:
         rectangle = patches.Rectangle((node.coord_lower[0], node.coord_lower[1]), 
                                     node.coord_upper[0] - node.coord_lower[0], 

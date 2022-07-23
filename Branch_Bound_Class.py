@@ -1,9 +1,11 @@
 from packages import *
-from utilities import fx, Q, plot_space
+from utilities import plot_space #, fx, Q
 from BB_Node_Class import BB_node
+from Bounding.LipschitzBound import upperBoundWithLipschitz
 
 class Branch_Bound:
-    def __init__(self, coord_up=None, coord_low=None, verbose=False, eta=1e-3, dim=2, eps=0.1):
+    def __init__(self, coord_up=None, coord_low=None, verbose=False, eta=1e-3, 
+                        dim=2, eps=0.1, network=None, queryCoefficient=None):
         self.space_nodes = [BB_node(np.infty, -np.infty, coord_up, coord_low)]
         self.BUB = None
         self.BLB = None
@@ -12,9 +14,11 @@ class Branch_Bound:
         self.verbose = verbose
         self.eta = eta
         self.PGD_iter = 5
-        self.bach_number = 1
+        self.bach_number = 2
         self.dim = dim
         self.eps = eps
+        self.net = network
+        self.queryCoefficient = queryCoefficient
 
     def prune(self):
         for node in self.space_nodes:
@@ -24,8 +28,10 @@ class Branch_Bound:
                     print('deleted')
 
     def lower_bound(self, index):
-        temp = self.space_nodes[index].coord_lower
-        return (0.25 * temp.T @ Q @ temp - 1 / (10 + 10 * len(self.space_nodes)))
+        return upperBoundWithLipschitz(network=self.net, queryCoefficient=self.queryCoefficient,
+                                            inputLowerBound=self.space_nodes[index].coord_lower,
+                                            inputUpperBound=self.space_nodes[index].coord_upper,
+                                            device=torch.device('cpu', 0))
 
     def upper_bound(self, index):
         # add gradient descent
@@ -35,11 +41,12 @@ class Branch_Bound:
 
         x = Variable(torch.from_numpy(x0.astype('float')).float(), requires_grad=True)
         
+        # Gradient Descent
         for i in range(self.PGD_iter):
             x.requires_grad = True
             for j in range(self.bach_number):
                 with torch.autograd.profiler.profile() as prof:
-                    ll = fx(x[j], torch)
+                    ll = self.queryCoefficient @ self.net.forward(x[j])
                     ll.backward()
                     # l.append(ll.data)
 
@@ -47,25 +54,11 @@ class Branch_Bound:
                 gradient = x.grad.data
                 x = x - self.eta * gradient
 
-            # Calculating the diagonals together
-            # with no_grad():
-            #     print(x)
-            #     print("+")
-            #     gradient = jacobian(expression_reducer, x)
-            #     print('grad', gradient)
-            #     x = x - self.eta * gradient
-
-        # # x = torch.clip(x, torch.from_numpy(self.space_nodes[index].coord_lower), 
-        # #                         torch.from_numpy(self.space_nodes[index].coord_upper)).float()
-
-        # # x = torch.clamp(x, torch.from_numpy(self.space_nodes[index].coord_lower).float(), 
-        # #                         torch.from_numpy(self.space_nodes[index].coord_upper).float()).float()
-
+        # Projection
         x = torch.max(torch.min(x, torch.from_numpy(self.space_nodes[index].coord_upper).float()),
                         torch.from_numpy(self.space_nodes[index].coord_lower).float())
 
-        ub = np.min([fx(xx, torch) for xx in x])
-
+        ub = torch.min(torch.Tensor([self.queryCoefficient @ self.net.forward(xx) for xx in x]))
         return ub
 
     def branch(self):
@@ -123,8 +116,8 @@ class Branch_Bound:
             for ind in indeces:
                 self.bound(ind, deleted_ub, deleted_lb)
 
-            self.BUB = np.min([self.space_nodes[i].upper for i in range(len(self.space_nodes))])
-            self.BLB = np.min([self.space_nodes[i].lower for i in range(len(self.space_nodes))])
+            self.BUB = torch.min(torch.Tensor([self.space_nodes[i].upper for i in range(len(self.space_nodes))]))
+            self.BLB = torch.min(torch.Tensor([self.space_nodes[i].lower for i in range(len(self.space_nodes))]))
             
             if self.verbose:
                 print(self.BLB , self.BUB)
