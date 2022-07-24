@@ -7,7 +7,6 @@ class NN(nn.Module):
                 nn.Linear(2, 10), 
                 nn.ReLU(),
                 nn.Linear(10, 2),
-                nn.ReLU()
         )
 
     # def train(self):

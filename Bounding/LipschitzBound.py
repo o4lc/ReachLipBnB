@@ -13,10 +13,11 @@ def upperBoundWithLipschitz(network: nn.Module,
 
     weights = extractWeightsFromNetwork(network)
     # I added .float() at the end
-    dMatrix = torch.diag(torch.tensor(2., device=device) / (inputUpperBound - inputLowerBound)).float()
+    dMatrix = torch.diag((inputUpperBound - inputLowerBound) / torch.tensor(2., device=device)).float()
     weights[0] = weights[0] @ dMatrix
     weights[-1] = queryCoefficient @ weights[-1]
     lipschitzConstant = calculateLipschitzConstant(weights, device)[-1]
+    print("lipschitz constant: {}".format(lipschitzConstant))
     # I changed the next line
     upperBound = queryCoefficient @ network((inputUpperBound + inputLowerBound) / torch.tensor(2., device=device)) - lipschitzConstant
     return upperBound
