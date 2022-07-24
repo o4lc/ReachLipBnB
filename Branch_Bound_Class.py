@@ -1,5 +1,6 @@
+from tabnanny import verbose
 from packages import *
-from utilities import plot_space #, fx, Q
+from utilities import Plotter
 from BB_Node_Class import BB_node
 from Bounding.LipschitzBound import upperBoundWithLipschitz
 
@@ -108,6 +109,9 @@ class Branch_Bound:
         self.BUB = np.infty
         self.BLB = -np.infty
 
+        if self.verbose:
+            plotter = Plotter()
+
         # print("#1", self.space_nodes)
         self.bound(0, self.BUB, self.BLB)
         while self.BUB - self.BLB >= self.eps:
@@ -121,11 +125,11 @@ class Branch_Bound:
             
             if self.verbose:
                 print(self.BLB , self.BUB)
-                plot_space(self.space_nodes, self.init_coord_low, self.init_coord_up)
+                plotter.plotSpace(self.space_nodes, self.init_coord_low, self.init_coord_up)
                 print('--------------------')
 
-
-
+        if self.verbose:
+            plotter.showAnimation()
         return self.BLB, self.BUB, self.space_nodes
 
     def __repr__(self):
