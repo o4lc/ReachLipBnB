@@ -5,7 +5,7 @@ from NN_Class import NN
 
 def main():
     dim = 2
-    eps = 0.1
+    eps = 1
     verbose = 0
 
     network = NN()

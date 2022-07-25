@@ -9,6 +9,7 @@ class NN(nn.Module):
                 nn.Linear(10, 2),
         )
 
+    # @TODO
     # def train(self):
 
     def forward(self, x):
