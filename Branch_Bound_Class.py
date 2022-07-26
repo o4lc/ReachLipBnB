@@ -7,7 +7,7 @@ from Bounding.LipschitzBound import upperBoundWithLipschitz
 class Branch_Bound:
     def __init__(self, coordUp=None, coordLow=None, verbose=False, eta=1e-3, 
                         dim=2, eps=0.1, network=None, queryCoefficient=None,
-                        pgdIterNum=5, batchNumber=2):
+                        pgdIterNum=5, batchNumber=3):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow)]
         self.BUB = None
         self.BLB = None
@@ -42,24 +42,24 @@ class Branch_Bound:
 
         x = Variable(torch.from_numpy(x0.astype('float')).float(), requires_grad=True)
         
-        # Gradient Descent
+        # Batch Gradient Descent
         for i in range(self.pgdIterNum):
             x.requires_grad = True
-            for j in range(self.batchNumber):
-                with torch.autograd.profiler.profile() as prof:
-                    ll = self.queryCoefficient @ self.network.forward(x[j])
-                    ll.backward()
-                    # l.append(ll.data)
+            with torch.autograd.profiler.profile() as prof:
+                def loss_reducer(x):
+                    return self.queryCoefficient @ torch.t(self.network.forward(x))
 
+                gradient = jacobian(loss_reducer, x)
+            
             with no_grad():
-                gradient = x.grad.data
-                x = x - self.eta * gradient
+                x = x - self.eta * gradient.sum(-self.batchNumber)
+
 
         # Projection
         x = torch.max(torch.min(x, torch.from_numpy(self.spaceNodes[index].coordUpper).float()),
                         torch.from_numpy(self.spaceNodes[index].coordLower).float())
 
-        ub = torch.min(torch.Tensor([self.queryCoefficient @ self.network.forward(xx) for xx in x]))
+        ub = torch.min(torch.Tensor([self.queryCoefficient @ torch.t(self.network.forward(xx)) for xx in x]))
         return ub
 
     def branch(self):

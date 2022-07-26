@@ -59,6 +59,10 @@ class Plotter():
 
         ani = animation.ArtistAnimation(fig, self.images, interval=500, blit=True,
                                 repeat_delay=2000)
+        
+        fileNames = next(os.walk(self.savingDirectory), (None, None, []))[2]
+        for fileName in fileNames:
+            os.remove(self.savingDirectory + fileName)
 
         plt.axis('off')
         plt.title('Brand and Bound Sequence')

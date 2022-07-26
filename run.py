@@ -8,7 +8,7 @@ def main():
     eps = 1
     verbose = 0
 
-    network = NN()
+    network = NN(dim)
 
     lowerCoordinate = [-100.1, -100.1]
     upperCoordinate = [100.1, 100.1]
