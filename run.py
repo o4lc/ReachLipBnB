@@ -1,3 +1,5 @@
+import torch
+
 from packages import *
 
 from Branch_Bound_Class import Branch_Bound
@@ -7,15 +9,20 @@ def main():
     dim = 2
     eps = 1
     verbose = 0
+    device=torch.device("cpu")
 
     network = NN()
+
+    # torch.save(network.state_dict(), "randomNetwork.pth")
+    network.load("randomNetwork.pth")
 
     lowerCoordinate = [-100.1, -100.1]
     upperCoordinate = [100.1, 100.1]
     c = torch.Tensor([1, 2]).float()
 
     startTime = time.time()
-    BB = Branch_Bound(upperCoordinate, lowerCoordinate, verbose=verbose, dim=dim, eps=eps, network=network, queryCoefficient=c)
+    BB = Branch_Bound(upperCoordinate, lowerCoordinate, verbose=verbose, dim=dim, eps=eps, network=network,
+                      queryCoefficient=c, device=device)
     LB, UB, space_left = BB.run()
     endTime = time.time()
     if verbose:
