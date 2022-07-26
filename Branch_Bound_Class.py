@@ -2,12 +2,12 @@ from tabnanny import verbose
 from packages import *
 from utilities import Plotter
 from BB_Node_Class import BB_node
-from Bounding.LipschitzBound import upperBoundWithLipschitz
+from Bounding.LipschitzBound import LipschitzBounding
 
 class Branch_Bound:
     def __init__(self, coordUp=None, coordLow=None, verbose=False, eta=1e-3, 
                         dim=2, eps=0.1, network=None, queryCoefficient=None,
-                        pgdIterNum=5, batchNumber=2):
+                        pgdIterNum=5, batchNumber=2, device=torch.device("cuda", 0)):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow)]
         self.BUB = None
         self.BLB = None
@@ -21,6 +21,7 @@ class Branch_Bound:
         self.eps = eps
         self.network = network
         self.queryCoefficient = queryCoefficient
+        self.lowerBoundClass = LipschitzBounding(network, device)
 
     def prune(self):
         for node in self.spaceNodes:
@@ -30,10 +31,9 @@ class Branch_Bound:
                     print('deleted')
 
     def lowerBound(self, index):
-        return upperBoundWithLipschitz(network=self.network, queryCoefficient=self.queryCoefficient,
-                                            inputLowerBound=self.spaceNodes[index].coordLower,
-                                            inputUpperBound=self.spaceNodes[index].coordUpper,
-                                            device=torch.device('cpu', 0))
+        return self.lowerBoundClass.lowerBound(self.queryCoefficient,
+                                               self.spaceNodes[index].coordLower,
+                                               self.spaceNodes[index].coordUpper)
 
     def upperBound(self, index):
         x0 = np.random.uniform(low = self.spaceNodes[index].coordLower, 
