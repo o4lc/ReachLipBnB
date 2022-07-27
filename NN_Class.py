@@ -9,6 +9,9 @@ class NN(nn.Module):
                 nn.Linear(10, dim),
         )
 
+    def load(self, path):
+        stateDict = torch.load(path)
+        self.load_state_dict(stateDict)
     # @TODO
     # def train(self):
 
