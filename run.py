@@ -9,12 +9,13 @@ def main():
     dim = 2
     eps = 1
     verbose = 0
-    device=torch.device("cpu")
+    device=torch.device("cuda", 0)
 
     network = NN()
 
     # torch.save(network.state_dict(), "randomNetwork.pth")
     network.load("randomNetwork.pth")
+    # network.to(device)
 
     lowerCoordinate = [-100.1, -100.1]
     upperCoordinate = [100.1, 100.1]

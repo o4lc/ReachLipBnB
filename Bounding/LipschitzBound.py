@@ -3,21 +3,26 @@ from typing import List
 import numpy as np
 import torch
 import torch.nn as nn
+from copy import deepcopy
 
 
 class LipschitzBounding:
     def __init__(self,
                  network: nn.Module,
                  device=torch.device("cuda", 0)):
-        self.network = network
+        self.network = deepcopy(network)
+        self.network.to(device)
         self.device = device
-        self.weights = self.extractWeightsFromNetwork(network)
+        self.weights = self.extractWeightsFromNetwork(self.network)
         self.calculatedLipschitzConstants = []
 
     def lowerBound(self,
                    queryCoefficient: torch.Tensor,
                    inputLowerBound: torch.Tensor,
                    inputUpperBound: torch.Tensor):
+        queryCoefficient = queryCoefficient.to(self.device)
+        inputLowerBound = inputLowerBound.to(self.device)
+        inputUpperBound = inputUpperBound.to(self.device)
         # print("---------"*15)
         # this function is not optimal for cases in which an axis is cut into unequal segments
 
@@ -26,7 +31,7 @@ class LipschitzBounding:
         # print(dilationVector)
         batchSize = dilationVector.shape[0]
         batchesThatNeedLipschitzConstantCalculation = [i for i in range(batchSize)]
-        lipschitzConstants = -torch.ones(batchSize)
+        lipschitzConstants = -torch.ones(batchSize, device=self.device)
         locationOfUnavailableConstants = {}
         for batchCounter in range(batchSize):  # making it reversed might just help a tiny amount.
             foundLipschitzConstant = False
@@ -80,7 +85,7 @@ class LipschitzBounding:
         centerPoint = (inputUpperBound + inputLowerBound) / torch.tensor(2., device=self.device)
         with torch.no_grad():
             lowerBound = self.network(centerPoint) @ queryCoefficient - lipschitzConstants
-        return lowerBound
+        return lowerBound.cpu()
 
     @staticmethod
     def calculateLipschitzConstant(weights: List[torch.Tensor], device=torch.device("cuda", 0)):
