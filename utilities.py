@@ -1,4 +1,6 @@
 from fileinput import filename
+
+from nbformat import write
 from packages import *
 
 class Plotter():
@@ -15,6 +17,8 @@ class Plotter():
         plt.rcParams["figure.autolayout"] = True
         fig = plt.figure()
         ax = fig.add_subplot(111)
+        ax.set_aspect('equal', adjustable='box')
+
         rectangle = patches.Rectangle((lowCoord[0], lowCoord[1]), upperCoord[0] - lowCoord[0], upperCoord[1] - lowCoord[1], 
                                     edgecolor=None, facecolor="grey", linewidth=7, alpha=0.5)
         ax.add_patch(rectangle)
@@ -50,6 +54,8 @@ class Plotter():
 
         # Creating the gif with the saved pictures
         fig, ax = plt.subplots()
+        ax.set_aspect('equal', adjustable='box')
+
         num = len(next(os.walk(self.savingDirectory), (None, None, []))[2])
         self.images = []
         for i in range(num):
@@ -57,14 +63,18 @@ class Plotter():
             im = ax.imshow(image, animated=True)
             self.images.append([im])
 
-        ani = animation.ArtistAnimation(fig, self.images, interval=500, blit=True,
+        ani = animation.ArtistAnimation(fig, self.images, interval=3000, blit=True,
                                 repeat_delay=2000)
         
+        # Clearing the Directory
         fileNames = next(os.walk(self.savingDirectory), (None, None, []))[2]
         for fileName in fileNames:
             os.remove(self.savingDirectory + fileName)
 
         plt.axis('off')
         plt.title('Brand and Bound Sequence')
+        writergif = animation.PillowWriter(fps=2) 
+        ani.save(self.savingDirectory + 'Branch&Bound.gif', writer=writergif)
+
         plt.show()
        

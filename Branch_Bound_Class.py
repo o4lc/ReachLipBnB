@@ -7,8 +7,10 @@ from Bounding.LipschitzBound import LipschitzBounding
 class Branch_Bound:
     def __init__(self, coordUp=None, coordLow=None, verbose=False, eta=1e-3, 
                         dim=2, eps=0.1, network=None, queryCoefficient=None,
-                        pgdIterNum=5, batchNumber=2, device=torch.device("cuda", 0)):
-        self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow)]
+                        pgdIterNum=5, batchNumber=2, device=torch.device("cuda", 0),
+                        branch_method='SimpleBranch', branch_constant=2,
+                        scoreFunction='length'):
+        self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.BUB = None
         self.BLB = None
         self.initCoordUp = coordUp
@@ -22,6 +24,9 @@ class Branch_Bound:
         self.network = network
         self.queryCoefficient = queryCoefficient
         self.lowerBoundClass = LipschitzBounding(network, device)
+        self.branch_method = branch_method
+        self.branch_constant = branch_constant
+        self.scoreFunction = scoreFunction
 
     def prune(self):
         for node in self.spaceNodes:
@@ -66,35 +71,47 @@ class Branch_Bound:
         # Prunning Function
         self.prune()
 
-        # Choosing the node to branch
-        maxScore, maxIndex = -1, -1
-        for i in range(len(self.spaceNodes)):
-            if self.spaceNodes[i].score > maxScore:
-                maxIndex = i
-                maxScore = self.spaceNodes[i].score
+        if self.branch_method == 'SimpleBranch':
+            #@TODO Choosing the node to branch -> this parts should be swaped with the sort idea
+            maxScore, maxIndex = -1, -1
+            for i in range(len(self.spaceNodes)):
+                if self.spaceNodes[i].score > maxScore:
+                    maxIndex = i
+                    maxScore = self.spaceNodes[i].score
 
-        coordToSplit = np.argmax(self.spaceNodes[maxIndex].coordUpper 
-                                   - self.spaceNodes[maxIndex].coordLower)
+            coordToSplit = np.argmax(self.spaceNodes[maxIndex].coordUpper 
+                                    - self.spaceNodes[maxIndex].coordLower)
         
-        # This can be optimized by keeping the best previous 'x's in that space
-        node = self.spaceNodes.pop(maxIndex)
-        nodeLow = np.array(node.coordLower, dtype=float)
-        nodeUp = np.array(node.coordUpper, dtype=float)
+            
+            #@TODO This can be optimized by keeping the best previous 'x's in that space
+            node = self.spaceNodes.pop(maxIndex)
+            nodeLow = np.array(node.coordLower, dtype=float)
+            nodeUp = np.array(node.coordUpper, dtype=float)
 
+            '''
+            @TODO
+            Python Float Calculation Problem
+            Need to round up ? 
+            '''
+            parentNodeUpperBound = np.array(nodeUp, dtype=float)
+            parentNodeLowerBound = np.array(nodeLow, dtype=float)
+            newIntervals = [x for x in np.linspace(parentNodeLowerBound[coordToSplit],
+                                                    parentNodeUpperBound[coordToSplit],
+                                                    self.branch_constant + 1)]
+            for i in range(self.branch_constant):
+                tempLow = parentNodeLowerBound
+                tempLow[coordToSplit] = newIntervals[i]
 
-        newAxis = (node.coordUpper[coordToSplit] + 
-                           node.coordLower[coordToSplit])/2
+                tempHigh = parentNodeUpperBound
+                tempHigh[coordToSplit] = newIntervals[i+1]
 
-        nodeSplitU1 = np.array(nodeUp, dtype=float)
-        nodeSplitU1[coordToSplit] = newAxis
+                self.spaceNodes.append(BB_node(np.infty, -np.infty, tempHigh, tempLow, scoreFunction=self.scoreFunction))
 
-        nodeSplitL2 = np.array(nodeLow, dtype=float)
-        nodeSplitL2[coordToSplit] = newAxis
-
-        self.spaceNodes.append(BB_node(np.infty, -np.infty, nodeSplitU1, nodeLow))
-        self.spaceNodes.append(BB_node(np.infty, -np.infty, nodeUp, nodeSplitL2))
-                
-        return [len(self.spaceNodes) - 2, len(self.spaceNodes) - 1], node.upper, node.lower
+            return [len(self.spaceNodes) - j for j in range(1, self.branch_constant + 1)], node.upper, node.lower
+        
+        else:
+            print("Not Implemented Yet!")
+            return None
 
     def bound(self, indices, parent_ub, parent_lb):
         lowerBounds = torch.maximum(self.lowerBound(indices), parent_lb)
@@ -112,23 +129,15 @@ class Branch_Bound:
             plotter = Plotter()
 
         self.bound([0], self.BUB, self.BLB)
-        count = 0
         while self.BUB - self.BLB >= self.eps:
-            # count += 1
-            # if count == 3:
-            #     break
             indeces, deletedUb, deletedLb = self.branch()
-            print(indeces)
             self.bound(indeces, deletedUb, deletedLb)
-            # for ind in indeces:
-            #     # todo: add twice
-            #     self.bound(ind, deletedUb, deletedLb)
 
             self.BUB = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
             self.BLB = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
             
             if self.verbose:
-                print(self.BLB , self.BUB)
+                print('Best UB', self.BLB , 'Best LB' , self.BUB)
                 plotter.plotSpace(self.spaceNodes, self.initCoordLow, self.initCoordUp)
                 print('--------------------')
 

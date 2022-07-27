@@ -7,9 +7,14 @@ from NN_Class import NN
 
 def main():
     dim = 2
-    eps = 1
-    verbose = 0
-    device=torch.device("cuda", 0)
+    eps = 60
+    verbose = 1
+
+    if torch.cuda.is_available():
+        device=torch.device("cuda", 0)
+    else:
+        device=torch.device("cpu", 0)
+
 
     network = NN(dim)
 
@@ -23,9 +28,10 @@ def main():
 
     startTime = time.time()
     BB = Branch_Bound(upperCoordinate, lowerCoordinate, verbose=verbose, dim=dim, eps=eps, network=network,
-                      queryCoefficient=c, device=device)
+                      queryCoefficient=c, device=device, branch_constant=8, scoreFunction='volume')
     LB, UB, space_left = BB.run()
     endTime = time.time()
+
     if verbose:
         print(BB)
 
