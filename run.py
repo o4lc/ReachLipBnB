@@ -7,28 +7,28 @@ from NN_Class import NN
 
 def main():
     dim = 2
-    eps = 60
-    verbose = 1
+    eps = .0001
+    verbose = 0
 
     if torch.cuda.is_available():
         device=torch.device("cuda", 0)
     else:
-        device=torch.device("cpu", 0)
+        device=torch.device("cpu")
 
-
+    # device=torch.device("cpu")
     network = NN(dim)
 
     # torch.save(network.state_dict(), "randomNetwork.pth")
     network.load("randomNetwork.pth")
-    # network.to(device)
+    network.to(device)
 
-    lowerCoordinate = [-100.1, -100.1]
-    upperCoordinate = [100.1, 100.1]
-    c = torch.Tensor([1, 2]).float()
+    lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
+    upperCoordinate = torch.Tensor([1., 1.]).to(device)
+    c = torch.Tensor([1., 2]).to(device)
 
     startTime = time.time()
     BB = Branch_Bound(upperCoordinate, lowerCoordinate, verbose=verbose, dim=dim, eps=eps, network=network,
-                      queryCoefficient=c, device=device, branch_constant=8, scoreFunction='volume')
+                      queryCoefficient=c, device=device, branch_constant=2, scoreFunction='length', pgdIterNum=0)
     LB, UB, space_left = BB.run()
     endTime = time.time()
 

@@ -1,15 +1,18 @@
 from tabnanny import verbose
+
+import torch
+
 from packages import *
 from utilities import Plotter
 from BB_Node_Class import BB_node
 from Bounding.LipschitzBound import LipschitzBounding
 
 class Branch_Bound:
-    def __init__(self, coordUp=None, coordLow=None, verbose=False, eta=1e-3, 
-                        dim=2, eps=0.1, network=None, queryCoefficient=None,
-                        pgdIterNum=5, batchNumber=2, device=torch.device("cuda", 0),
-                        branch_method='SimpleBranch', branch_constant=2,
-                        scoreFunction='length'):
+    def __init__(self, coordUp=None, coordLow=None, verbose=False, eta=1e-3,
+                 dim=2, eps=0.1, network=None, queryCoefficient=None,
+                 pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
+                 branch_method='SimpleBranch', branch_constant=2,
+                 scoreFunction='length'):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.BUB = None
         self.BLB = None
@@ -18,7 +21,7 @@ class Branch_Bound:
         self.verbose = verbose
         self.eta = eta
         self.pgdIterNum = pgdIterNum
-        self.batchNumber = batchNumber
+        self.pgdNumberOfInitializations = pgdNumberOfInitializations
         self.dim = dim
         self.eps = eps
         self.network = network
@@ -27,6 +30,7 @@ class Branch_Bound:
         self.branch_method = branch_method
         self.branch_constant = branch_constant
         self.scoreFunction = scoreFunction
+        self.device = device
 
     def prune(self):
         for node in self.spaceNodes:
@@ -36,21 +40,24 @@ class Branch_Bound:
                     print('deleted')
 
     def lowerBound(self, indices):
-        lowerBounds = torch.from_numpy(np.array([self.spaceNodes[index].coordLower for index in indices]))
-        upperBounds = torch.from_numpy(np.array([self.spaceNodes[index].coordUpper for index in indices]))
+
+        # lowerBounds = torch.from_numpy(np.array([self.spaceNodes[index].coordLower for index in indices]))
+        # upperBounds = torch.from_numpy(np.array([self.spaceNodes[index].coordUpper for index in indices]))
+        lowerBounds = torch.vstack([self.spaceNodes[index].coordLower for index in indices])
+        upperBounds = torch.vstack([self.spaceNodes[index].coordUpper for index in indices])
         return self.lowerBoundClass.lowerBound(self.queryCoefficient, lowerBounds, upperBounds)
 
     def upperBound(self, index):
-        x0 = np.random.uniform(low = self.spaceNodes[index].coordLower, 
-                                          high = self.spaceNodes[index].coordUpper,
-                                            size=(self.batchNumber, self.dim))
+        x0 = (self.spaceNodes[index].coordUpper - self.spaceNodes[index].coordLower) \
+             * torch.rand(self.pgdNumberOfInitializations, self.dim, device=self.device) \
+             + self.spaceNodes[index].coordLower
 
-        x = Variable(torch.from_numpy(x0.astype('float')).float(), requires_grad=True)
+        x = Variable(x0, requires_grad=True)
         
         # Gradient Descent
         for i in range(self.pgdIterNum):
             x.requires_grad = True
-            for j in range(self.batchNumber):
+            for j in range(self.pgdNumberOfInitializations):
                 with torch.autograd.profiler.profile() as prof:
                     ll = self.queryCoefficient @ self.network.forward(x[j])
                     ll.backward()
@@ -61,10 +68,10 @@ class Branch_Bound:
                 x = x - self.eta * gradient
 
         # Projection
-        x = torch.max(torch.min(x, torch.from_numpy(self.spaceNodes[index].coordUpper).float()),
-                        torch.from_numpy(self.spaceNodes[index].coordLower).float())
 
-        ub = torch.min(torch.Tensor([self.queryCoefficient @ self.network.forward(xx) for xx in x]))
+        x = torch.clamp(x, self.spaceNodes[index].coordLower, self.spaceNodes[index].coordUpper)
+
+        ub = torch.min(self.network(x) @ self.queryCoefficient)
         return ub
 
     def branch(self):
@@ -79,34 +86,29 @@ class Branch_Bound:
                     maxIndex = i
                     maxScore = self.spaceNodes[i].score
 
-            coordToSplit = np.argmax(self.spaceNodes[maxIndex].coordUpper 
-                                    - self.spaceNodes[maxIndex].coordLower)
-        
-            
+            coordToSplit = torch.argmax(self.spaceNodes[maxIndex].coordUpper - self.spaceNodes[maxIndex].coordLower)
+
             #@TODO This can be optimized by keeping the best previous 'x's in that space
             node = self.spaceNodes.pop(maxIndex)
-            nodeLow = np.array(node.coordLower, dtype=float)
-            nodeUp = np.array(node.coordUpper, dtype=float)
 
-            '''
-            @TODO
-            Python Float Calculation Problem
-            Need to round up ? 
-            '''
-            parentNodeUpperBound = np.array(nodeUp, dtype=float)
-            parentNodeLowerBound = np.array(nodeLow, dtype=float)
-            newIntervals = [x for x in np.linspace(parentNodeLowerBound[coordToSplit],
-                                                    parentNodeUpperBound[coordToSplit],
-                                                    self.branch_constant + 1)]
+            # '''
+            # @TODO
+            # Python Float Calculation Problem
+            # Need to round up ?
+            # '''
+            parentNodeUpperBound = node.coordUpper
+            parentNodeLowerBound = node.coordLower
+
+            newIntervals = torch.linspace(parentNodeLowerBound[coordToSplit],
+                                          parentNodeUpperBound[coordToSplit],
+                                          self.branch_constant + 1)
             for i in range(self.branch_constant):
-                tempLow = parentNodeLowerBound
+                tempLow = parentNodeLowerBound.clone()
+                tempHigh = parentNodeUpperBound.clone()
+
                 tempLow[coordToSplit] = newIntervals[i]
-
-                tempHigh = parentNodeUpperBound
                 tempHigh[coordToSplit] = newIntervals[i+1]
-
                 self.spaceNodes.append(BB_node(np.infty, -np.infty, tempHigh, tempLow, scoreFunction=self.scoreFunction))
-
             return [len(self.spaceNodes) - j for j in range(1, self.branch_constant + 1)], node.upper, node.lower
         
         else:
@@ -122,16 +124,16 @@ class Branch_Bound:
 
 
     def run(self):
-        self.BUB = torch.Tensor([torch.inf])
-        self.BLB = torch.Tensor([-torch.inf])
+        self.BUB = torch.Tensor([torch.inf]).to(self.device)
+        self.BLB = torch.Tensor([-torch.inf]).to(self.device)
 
         if self.verbose:
             plotter = Plotter()
 
         self.bound([0], self.BUB, self.BLB)
         while self.BUB - self.BLB >= self.eps:
-            indeces, deletedUb, deletedLb = self.branch()
-            self.bound(indeces, deletedUb, deletedLb)
+            indices, deletedUb, deletedLb = self.branch()
+            self.bound(indices, deletedUb, deletedLb)
 
             self.BUB = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
             self.BLB = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))

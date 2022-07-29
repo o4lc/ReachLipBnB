@@ -10,8 +10,7 @@ class LipschitzBounding:
     def __init__(self,
                  network: nn.Module,
                  device=torch.device("cuda", 0)):
-        self.network = deepcopy(network)
-        self.network.to(device)
+        self.network = network
         self.device = device
         self.weights = self.extractWeightsFromNetwork(self.network)
         self.calculatedLipschitzConstants = []
@@ -20,14 +19,12 @@ class LipschitzBounding:
                    queryCoefficient: torch.Tensor,
                    inputLowerBound: torch.Tensor,
                    inputUpperBound: torch.Tensor):
-        queryCoefficient = queryCoefficient.to(self.device)
-        inputLowerBound = inputLowerBound.to(self.device)
-        inputUpperBound = inputUpperBound.to(self.device)
+
         # print("---------"*15)
         # this function is not optimal for cases in which an axis is cut into unequal segments
 
         # I added .float() at the end
-        dilationVector = ((inputUpperBound - inputLowerBound) / torch.tensor(2., device=self.device)).float()
+        dilationVector = (inputUpperBound - inputLowerBound) / torch.tensor(2., device=self.device)
         # print(dilationVector)
         batchSize = dilationVector.shape[0]
         batchesThatNeedLipschitzConstantCalculation = [i for i in range(batchSize)]
@@ -85,7 +82,7 @@ class LipschitzBounding:
         centerPoint = (inputUpperBound + inputLowerBound) / torch.tensor(2., device=self.device)
         with torch.no_grad():
             lowerBound = self.network(centerPoint) @ queryCoefficient - lipschitzConstants
-        return lowerBound.cpu()
+        return lowerBound
 
     @staticmethod
     def calculateLipschitzConstant(weights: List[torch.Tensor], device=torch.device("cuda", 0)):
