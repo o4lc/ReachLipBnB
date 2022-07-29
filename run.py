@@ -7,7 +7,7 @@ from NN_Class import NN
 
 def main():
     dim = 2
-    eps = .0001
+    eps = 1
     verbose = 0
 
     if torch.cuda.is_available():
@@ -19,7 +19,7 @@ def main():
     network = NN(dim)
 
     # torch.save(network.state_dict(), "randomNetwork.pth")
-    network.load("randomNetwork.pth")
+    network.load("./Networks/randomNetwork.pth")
     network.to(device)
 
     lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
