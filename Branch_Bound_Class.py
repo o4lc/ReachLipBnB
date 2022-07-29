@@ -54,21 +54,32 @@ class Branch_Bound:
 
         x = Variable(x0, requires_grad=True)
         
-        # Gradient Descent
+        # # Gradient Descent
+        # for i in range(self.pgdIterNum):
+        #     x.requires_grad = True
+        #     for j in range(self.pgdNumberOfInitializations):
+        #         with torch.autograd.profiler.profile() as prof:
+        #             ll = self.queryCoefficient @ self.network.forward(x[j])
+        #             ll.backward()
+        #             # l.append(ll.data)
+        #
+        #     with no_grad():
+        #         gradient = x.grad.data
+        #         x = x - self.eta * gradient
+
+        # Batch Gradient Descent
         for i in range(self.pgdIterNum):
             x.requires_grad = True
-            for j in range(self.pgdNumberOfInitializations):
-                with torch.autograd.profiler.profile() as prof:
-                    ll = self.queryCoefficient @ self.network.forward(x[j])
-                    ll.backward()
-                    # l.append(ll.data)
+            with torch.autograd.profiler.profile() as prof:
+                def loss_reducer(x):
+                    return self.network.forward(x) @ self.queryCoefficient
+
+                gradient = jacobian(loss_reducer, x)
 
             with no_grad():
-                gradient = x.grad.data
-                x = x - self.eta * gradient
+                x = x - self.eta * gradient.sum(-self.pgdNumberOfInitializations)
 
         # Projection
-
         x = torch.clamp(x, self.spaceNodes[index].coordLower, self.spaceNodes[index].coordUpper)
 
         ub = torch.min(self.network(x) @ self.queryCoefficient)

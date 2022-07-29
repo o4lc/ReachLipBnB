@@ -28,7 +28,7 @@ def main():
 
     startTime = time.time()
     BB = Branch_Bound(upperCoordinate, lowerCoordinate, verbose=verbose, dim=dim, eps=eps, network=network,
-                      queryCoefficient=c, device=device, branch_constant=2, scoreFunction='length', pgdIterNum=0)
+                      queryCoefficient=c, device=device, branch_constant=2, scoreFunction='length', pgdIterNum=1)
     LB, UB, space_left = BB.run()
     endTime = time.time()
 
