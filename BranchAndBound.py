@@ -4,92 +4,57 @@ import torch
 
 from packages import *
 from utilities import Plotter
-from BB_Node_Class import BB_node
+from BranchAndBoundNode import BB_node
 from Bounding.LipschitzBound import LipschitzBounding
+from Bounding.PgdUpperBound import PgdUpperBound
 
-class Branch_Bound:
-    def __init__(self, coordUp=None, coordLow=None, verbose=False, eta=1e-3,
-                 dim=2, eps=0.1, network=None, queryCoefficient=None,
+
+class BranchAndBound:
+    def __init__(self, coordUp=None, coordLow=None, verbose=False, pgdStepSize=1e-3,
+                 inputDimension=2, eps=0.1, network=None, queryCoefficient=None,
                  pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
-                 branch_method='SimpleBranch', branch_constant=2,
+                 branchingMethod='SimpleBranch', branch_constant=2,
                  scoreFunction='length'):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
-        self.BUB = None
-        self.BLB = None
+        self.bestUpperBound = None
+        self.bestLowerBound = None
         self.initCoordUp = coordUp
         self.initCoordLow = coordLow
         self.verbose = verbose
-        self.eta = eta
         self.pgdIterNum = pgdIterNum
         self.pgdNumberOfInitializations = pgdNumberOfInitializations
-        self.dim = dim
+        self.inputDimension = inputDimension
         self.eps = eps
         self.network = network
         self.queryCoefficient = queryCoefficient
         self.lowerBoundClass = LipschitzBounding(network, device)
-        self.branch_method = branch_method
+        self.upperBoundClass = PgdUpperBound(network, pgdNumberOfInitializations, pgdIterNum, pgdStepSize,
+                                             inputDimension, device)
+        self.branchingMethod = branchingMethod
         self.branch_constant = branch_constant
         self.scoreFunction = scoreFunction
         self.device = device
 
     def prune(self):
         for node in self.spaceNodes:
-            if node.lower >= self.BUB:
+            if node.lower >= self.bestUpperBound:
                 self.spaceNodes.remove(node)
                 if self.verbose:
                     print('deleted')
 
     def lowerBound(self, indices):
-
-        # lowerBounds = torch.from_numpy(np.array([self.spaceNodes[index].coordLower for index in indices]))
-        # upperBounds = torch.from_numpy(np.array([self.spaceNodes[index].coordUpper for index in indices]))
         lowerBounds = torch.vstack([self.spaceNodes[index].coordLower for index in indices])
         upperBounds = torch.vstack([self.spaceNodes[index].coordUpper for index in indices])
         return self.lowerBoundClass.lowerBound(self.queryCoefficient, lowerBounds, upperBounds)
 
     def upperBound(self, index):
-        x0 = (self.spaceNodes[index].coordUpper - self.spaceNodes[index].coordLower) \
-             * torch.rand(self.pgdNumberOfInitializations, self.dim, device=self.device) \
-             + self.spaceNodes[index].coordLower
-
-        x = Variable(x0, requires_grad=True)
-        
-        # # Gradient Descent
-        # for i in range(self.pgdIterNum):
-        #     x.requires_grad = True
-        #     for j in range(self.pgdNumberOfInitializations):
-        #         with torch.autograd.profiler.profile() as prof:
-        #             ll = self.queryCoefficient @ self.network.forward(x[j])
-        #             ll.backward()
-        #             # l.append(ll.data)
-        #
-        #     with no_grad():
-        #         gradient = x.grad.data
-        #         x = x - self.eta * gradient
-
-        # Batch Gradient Descent
-        for i in range(self.pgdIterNum):
-            x.requires_grad = True
-            with torch.autograd.profiler.profile() as prof:
-                def loss_reducer(x):
-                    return self.network.forward(x) @ self.queryCoefficient
-
-                gradient = jacobian(loss_reducer, x)
-
-            with no_grad():
-                x = x - self.eta * gradient.sum(-self.pgdNumberOfInitializations)
-
-        # Projection
-        x = torch.clamp(x, self.spaceNodes[index].coordLower, self.spaceNodes[index].coordUpper)
-
-        ub = torch.min(self.network(x) @ self.queryCoefficient)
-        return ub
+        return self.upperBoundClass.upperBound(index, self.spaceNodes, self.queryCoefficient)
 
     def branch(self):
         # Prunning Function
         self.prune()
 
-        if self.branch_method == 'SimpleBranch':
+        if self.branchingMethod == 'SimpleBranch':
             #@TODO Choosing the node to branch -> this parts should be swaped with the sort idea
             maxScore, maxIndex = -1, -1
             for i in range(len(self.spaceNodes)):
@@ -135,28 +100,28 @@ class Branch_Bound:
 
 
     def run(self):
-        self.BUB = torch.Tensor([torch.inf]).to(self.device)
-        self.BLB = torch.Tensor([-torch.inf]).to(self.device)
+        self.bestUpperBound = torch.Tensor([torch.inf]).to(self.device)
+        self.bestLowerBound = torch.Tensor([-torch.inf]).to(self.device)
 
         if self.verbose:
             plotter = Plotter()
 
-        self.bound([0], self.BUB, self.BLB)
-        while self.BUB - self.BLB >= self.eps:
+        self.bound([0], self.bestUpperBound, self.bestLowerBound)
+        while self.bestUpperBound - self.bestLowerBound >= self.eps:
             indices, deletedUb, deletedLb = self.branch()
             self.bound(indices, deletedUb, deletedLb)
 
-            self.BUB = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
-            self.BLB = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
+            self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
+            self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
             
             if self.verbose:
-                print('Best UB', self.BLB , 'Best LB' , self.BUB)
+                print('Best UB', self.bestLowerBound, 'Best LB', self.bestUpperBound)
                 plotter.plotSpace(self.spaceNodes, self.initCoordLow, self.initCoordUp)
                 print('--------------------')
 
         if self.verbose:
             plotter.showAnimation()
-        return self.BLB, self.BUB, self.spaceNodes
+        return self.bestLowerBound, self.bestUpperBound, self.spaceNodes
 
     def __repr__(self):
         string = 'These are the remaining nodes: \n'

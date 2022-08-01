@@ -6,6 +6,12 @@ import torch.nn as nn
 from copy import deepcopy
 
 
+"""
+We can make this function faster for the purpose of reachability analysis. In such uses, we would neet to save 
+not only the lipschitz constant, but the query coefficient used to calculate the terms and with these, 
+we would only need to recalculate the final step m_l for the new query coefficient 
+"""
+
 class LipschitzBounding:
     def __init__(self,
                  network: nn.Module,

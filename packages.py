@@ -1,5 +1,4 @@
 import numpy as np
-import cvxpy as cp
 
 import torch
 from torch.autograd import Variable
