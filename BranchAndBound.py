@@ -13,7 +13,7 @@ class BranchAndBound:
     def __init__(self, coordUp=None, coordLow=None, verbose=False, pgdStepSize=1e-3,
                  inputDimension=2, eps=0.1, network=None, queryCoefficient=None,
                  pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
-                 branchingMethod='SimpleBranch', branch_constant=2,
+                 branchingMethod='SimpleBranch', nodeBranchingFactor=2,
                  scoreFunction='length'):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = None
@@ -31,7 +31,7 @@ class BranchAndBound:
         self.upperBoundClass = PgdUpperBound(network, pgdNumberOfInitializations, pgdIterNum, pgdStepSize,
                                              inputDimension, device)
         self.branchingMethod = branchingMethod
-        self.branch_constant = branch_constant
+        self.nodeBranchingFactor = nodeBranchingFactor
         self.scoreFunction = scoreFunction
         self.device = device
 
@@ -77,15 +77,15 @@ class BranchAndBound:
 
             newIntervals = torch.linspace(parentNodeLowerBound[coordToSplit],
                                           parentNodeUpperBound[coordToSplit],
-                                          self.branch_constant + 1)
-            for i in range(self.branch_constant):
+                                          self.nodeBranchingFactor + 1)
+            for i in range(self.nodeBranchingFactor):
                 tempLow = parentNodeLowerBound.clone()
                 tempHigh = parentNodeUpperBound.clone()
 
                 tempLow[coordToSplit] = newIntervals[i]
                 tempHigh[coordToSplit] = newIntervals[i+1]
                 self.spaceNodes.append(BB_node(np.infty, -np.infty, tempHigh, tempLow, scoreFunction=self.scoreFunction))
-            return [len(self.spaceNodes) - j for j in range(1, self.branch_constant + 1)], node.upper, node.lower
+            return [len(self.spaceNodes) - j for j in range(1, self.nodeBranchingFactor + 1)], node.upper, node.lower
         
         else:
             print("Not Implemented Yet!")

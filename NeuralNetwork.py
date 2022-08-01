@@ -1,6 +1,7 @@
 from packages import *
 
-class NN(nn.Module):
+
+class NeuralNetwork(nn.Module):
     def __init__(self, path):
         super().__init__()
         stateDictionary = torch.load(path)

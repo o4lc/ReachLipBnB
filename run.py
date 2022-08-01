@@ -3,7 +3,7 @@ import torch
 from packages import *
 
 from BranchAndBound import BranchAndBound
-from NeuralNetwork import NN
+from NeuralNetwork import NeuralNetwork
 
 def main():
 
@@ -16,12 +16,11 @@ def main():
         device = torch.device("cpu")
 
     # device=torch.device("cpu")
-    pathToStateDictionary = "Networks/randomNetwork.pth"
-    network = NN(pathToStateDictionary)
+    # pathToStateDictionary = "Networks/randomNetwork.pth"
+    pathToStateDictionary = "Networks/randomNetwork2.pth"
+    network = NeuralNetwork(pathToStateDictionary)
     dim = network.Linear[0].weight.shape[1]
 
-    # torch.save(network.state_dict(), "randomNetwork.pth")
-    # network.load("./Networks/randomNetwork.pth")
     network.to(device)
 
     lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
@@ -30,7 +29,7 @@ def main():
 
     startTime = time.time()
     BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
-                        queryCoefficient=c, device=device, branch_constant=2, scoreFunction='length', pgdIterNum=1)
+                        queryCoefficient=c, device=device, nodeBranchingFactor=2, scoreFunction='length', pgdIterNum=0)
     lowerBound, upperBound, space_left = BB.run()
     endTime = time.time()
 
