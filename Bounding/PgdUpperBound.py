@@ -14,7 +14,25 @@ class PgdUpperBound:
         self.device = device
         self.pgdStepSize = pgdStepSize
 
-    def upperBound(self, index, nodes, queryCoefficient):
+    def upperBound(self, indices, nodes, queryCoefficient):
+        upperBounds = []
+        if self.pgdIterNum == 0:
+            for index in indices:
+                upperBounds.append(self.upperBoundViaRandomPoints(index, nodes, queryCoefficient))
+        else:
+            for index in indices:
+                upperBounds.append(self.upperBoundPerIndexWithPgd(index, nodes, queryCoefficient))
+        return upperBounds
+
+    def upperBoundViaRandomPoints(self, index, nodes, queryCoefficient):
+        x = (nodes[index].coordUpper - nodes[index].coordLower) \
+             * torch.rand(self.pgdNumberOfInitializations, self.inputDimension, device=self.device) \
+             + nodes[index].coordLower
+
+        upperBound = torch.min(self.network(x) @ queryCoefficient)
+        return upperBound
+
+    def upperBoundPerIndexWithPgd(self, index, nodes, queryCoefficient):
         x0 = (nodes[index].coordUpper - nodes[index].coordLower) \
              * torch.rand(self.pgdNumberOfInitializations, self.inputDimension, device=self.device) \
              + nodes[index].coordLower

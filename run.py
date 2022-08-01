@@ -7,7 +7,7 @@ from NeuralNetwork import NeuralNetwork
 
 def main():
 
-    eps = .001
+    eps = 1
     verbose = 0
 
     if torch.cuda.is_available():
@@ -29,7 +29,7 @@ def main():
 
     startTime = time.time()
     BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
-                        queryCoefficient=c, device=device, nodeBranchingFactor=2, scoreFunction='length', pgdIterNum=0)
+                        queryCoefficient=c, device=device, nodeBranchingFactor=4, scoreFunction='volume', pgdIterNum=0)
     lowerBound, upperBound, space_left = BB.run()
     endTime = time.time()
 

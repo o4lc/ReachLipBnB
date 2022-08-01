@@ -47,8 +47,8 @@ class BranchAndBound:
         upperBounds = torch.vstack([self.spaceNodes[index].coordUpper for index in indices])
         return self.lowerBoundClass.lowerBound(self.queryCoefficient, lowerBounds, upperBounds)
 
-    def upperBound(self, index):
-        return self.upperBoundClass.upperBound(index, self.spaceNodes, self.queryCoefficient)
+    def upperBound(self, indices):
+        return self.upperBoundClass.upperBound(indices, self.spaceNodes, self.queryCoefficient)
 
     def branch(self):
         # Prunning Function
@@ -93,11 +93,10 @@ class BranchAndBound:
 
     def bound(self, indices, parent_ub, parent_lb):
         lowerBounds = torch.maximum(self.lowerBound(indices), parent_lb)
+        upperBounds = self.upperBound(indices)
         for i, index in enumerate(indices):
-            self.spaceNodes[index].upper = self.upperBound(index)
+            self.spaceNodes[index].upper = upperBounds[i]
             self.spaceNodes[index].lower = lowerBounds[i]
-        # self.spaceNodes[index].upper = min(cost_upper, parent_ub)
-
 
     def run(self):
         self.bestUpperBound = torch.Tensor([torch.inf]).to(self.device)
@@ -113,7 +112,7 @@ class BranchAndBound:
 
             self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
             self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
-            
+            # print(self.bestUpperBound, self.bestLowerBound)
             if self.verbose:
                 print('Best UB', self.bestLowerBound, 'Best LB', self.bestUpperBound)
                 plotter.plotSpace(self.spaceNodes, self.initCoordLow, self.initCoordUp)
