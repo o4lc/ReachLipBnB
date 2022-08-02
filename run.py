@@ -15,9 +15,10 @@ def main():
     else:
         device = torch.device("cpu")
 
-    device=torch.device("cpu")
-    pathToStateDictionary = "Networks/randomNetwork.pth"
+    # device=torch.device("cpu")
+    # pathToStateDictionary = "Networks/randomNetwork.pth"
     # pathToStateDictionary = "Networks/randomNetwork2.pth"
+    pathToStateDictionary = "Networks/trainedNetwork1.pth"
     network = NeuralNetwork(pathToStateDictionary)
     dim = network.Linear[0].weight.shape[1]
 
@@ -29,7 +30,8 @@ def main():
 
     startTime = time.time()
     BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
-                        queryCoefficient=c, device=device, nodeBranchingFactor=4, scoreFunction='volume', pgdIterNum=0)
+                        queryCoefficient=c, device=device, nodeBranchingFactor=8, scoreFunction='length',
+                        pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5)
     lowerBound, upperBound, space_left = BB.run()
     endTime = time.time()
 
