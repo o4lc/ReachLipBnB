@@ -51,6 +51,19 @@ class PgdUpperBound:
             with no_grad():
                 x = x - self.pgdStepSize * gradient.sum(-self.pgdNumberOfInitializations)
 
+
+        # Per Sample Gradient Descent
+        # for i in range(self.pgdIterNum):
+        #     x.requires_grad = True
+        #     with torch.autograd.profiler.profile() as prof:
+        #         fmodel, params, buffers = make_functional_with_buffers(self.network)
+        #         print(fmodel)
+        #         return None
+                
+
+        #     with no_grad():
+        #         x = x - self.eta * gradient.sum(-self.pgdNumberOfInitializations)
+
         # Projection
         x = torch.clamp(x, nodes[index].coordLower, nodes[index].coordUpper)
 

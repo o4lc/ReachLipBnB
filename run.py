@@ -15,9 +15,9 @@ def main():
     else:
         device = torch.device("cpu")
 
-    # device=torch.device("cpu")
-    # pathToStateDictionary = "Networks/randomNetwork.pth"
-    pathToStateDictionary = "Networks/randomNetwork2.pth"
+    device=torch.device("cpu")
+    pathToStateDictionary = "Networks/randomNetwork.pth"
+    # pathToStateDictionary = "Networks/randomNetwork2.pth"
     network = NeuralNetwork(pathToStateDictionary)
     dim = network.Linear[0].weight.shape[1]
 

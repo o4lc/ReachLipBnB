@@ -13,7 +13,7 @@ class BranchAndBound:
     def __init__(self, coordUp=None, coordLow=None, verbose=False, pgdStepSize=1e-3,
                  inputDimension=2, eps=0.1, network=None, queryCoefficient=None,
                  pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
-                 branchingMethod='SimpleBranch', nodeBranchingFactor=2,
+                 branchingMethod='SimpleBranch', nodeBranchingFactor=2, branchNodeNum = 1,
                  scoreFunction='length'):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = None
@@ -33,6 +33,7 @@ class BranchAndBound:
         self.branchingMethod = branchingMethod
         self.nodeBranchingFactor = nodeBranchingFactor
         self.scoreFunction = scoreFunction
+        self.branchNodeNum = branchNodeNum
         self.device = device
 
     def prune(self):
@@ -54,18 +55,22 @@ class BranchAndBound:
         # Prunning Function
         self.prune()
 
-        if self.branchingMethod == 'SimpleBranch':
-            #@TODO Choosing the node to branch -> this parts should be swaped with the sort idea
-            maxScore, maxIndex = -1, -1
-            for i in range(len(self.spaceNodes)):
-                if self.spaceNodes[i].score > maxScore:
-                    maxIndex = i
-                    maxScore = self.spaceNodes[i].score
-
-            coordToSplit = torch.argmax(self.spaceNodes[maxIndex].coordUpper - self.spaceNodes[maxIndex].coordLower)
-
+        # if self.branchMethod == 'SimpleBranch':
+        #@TODO Choosing the node to branch -> this parts should be swaped with the sort idea
+        scoreArray = torch.Tensor([self.spaceNodes[i].score for i in range(len(self.spaceNodes))])
+        scoreArraySorted = torch.argsort(scoreArray)
+        maxIndeces = scoreArraySorted[len(scoreArraySorted) - 1: len(scoreArraySorted) - self.branchNodeNum + 1]
+        
+        deletedUpperBounds = []
+        deletedLowerBounds = []
+        for maxIndex in maxIndeces:
+            coordToSplitSorted = torch.argsort(self.spaceNodes[maxIndex].coordUpper - self.spaceNodes[maxIndex].coordLower)
+            coordToSplit = coordToSplitSorted[len(coordToSplitSorted) - 1]
+            
             #@TODO This can be optimized by keeping the best previous 'x's in that space
             node = self.spaceNodes.pop(maxIndex)
+            deletedUpperBounds.append(node.upper)
+            deletedLowerBounds.append(node.lower)
 
             # '''
             # @TODO
@@ -75,9 +80,11 @@ class BranchAndBound:
             parentNodeUpperBound = node.coordUpper
             parentNodeLowerBound = node.coordLower
 
+
+            # Numpy can do this more efficently!
             newIntervals = torch.linspace(parentNodeLowerBound[coordToSplit],
-                                          parentNodeUpperBound[coordToSplit],
-                                          self.nodeBranchingFactor + 1)
+                                                    parentNodeUpperBound[coordToSplit],
+                                                    self.nodeBranchingFactor + 1)
             for i in range(self.nodeBranchingFactor):
                 tempLow = parentNodeLowerBound.clone()
                 tempHigh = parentNodeUpperBound.clone()
