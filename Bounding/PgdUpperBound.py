@@ -6,31 +6,51 @@ from torch.autograd.functional import jacobian
 
 class PgdUpperBound:
     def __init__(self, network, numberOfInitializationPoints, numberOfPgdSteps, pgdStepSize,
-                 inputSpaceDimension, device):
+                 inputSpaceDimension, device, maximumBatchSize):
         self.network = network
         self.pgdNumberOfInitializations = numberOfInitializationPoints
         self.pgdIterNum = numberOfPgdSteps
         self.inputDimension = inputSpaceDimension
         self.device = device
         self.pgdStepSize = pgdStepSize
+        self.maximumBatchSize = maximumBatchSize
 
     def upperBound(self, indices, nodes, queryCoefficient):
-        upperBounds = []
         if self.pgdIterNum == 0:
-            for index in indices:
-                upperBounds.append(self.upperBoundViaRandomPoints(index, nodes, queryCoefficient))
+            upperBounds = self.upperBoundViaRandomPoints(indices, nodes, queryCoefficient)
         else:
+            upperBounds = []
             for index in indices:
                 upperBounds.append(self.upperBoundPerIndexWithPgd(index, nodes, queryCoefficient))
         return upperBounds
 
-    def upperBoundViaRandomPoints(self, index, nodes, queryCoefficient):
-        x = (nodes[index].coordUpper - nodes[index].coordLower) \
-             * torch.rand(self.pgdNumberOfInitializations, self.inputDimension, device=self.device) \
-             + nodes[index].coordLower
+    def upperBoundViaRandomPoints(self, indices, nodes, queryCoefficient):
+        currentBatchSize = len(indices) * self.pgdNumberOfInitializations
+        multiplier = torch.zeros(currentBatchSize, self.inputDimension)
+        bias = torch.zeros(currentBatchSize, self.inputDimension)
 
-        upperBound = torch.min(self.network(x) @ queryCoefficient)
-        return upperBound
+        for i, index in enumerate(indices):
+            offset = self.pgdNumberOfInitializations * i
+            multiplier[offset: offset + self.pgdNumberOfInitializations, :] =\
+                nodes[index].coordUpper - nodes[index].coordLower
+            bias[offset: offset + self.pgdNumberOfInitializations, :] = nodes[index].coordLower
+        x = multiplier \
+            * torch.rand(currentBatchSize, self.inputDimension, device=self.device) \
+            + bias
+        if currentBatchSize > self.maximumBatchSize:
+            y = torch.zeros(currentBatchSize)
+            i = 0
+            while i < currentBatchSize:
+                y[i:i + self.maximumBatchSize] = self.network(x[i:i + self.maximumBatchSize, :]) @ queryCoefficient
+                i += self.maximumBatchSize
+        else:
+            with torch.no_grad():
+                y = self.network(x) @ queryCoefficient
+        upperBounds = []
+        for i in range(len(indices)):
+            offset = self.pgdNumberOfInitializations * i
+            upperBounds.append(torch.min(y[offset: offset + self.pgdNumberOfInitializations]))
+        return upperBounds
 
     def upperBoundPerIndexWithPgd(self, index, nodes, queryCoefficient):
         x0 = (nodes[index].coordUpper - nodes[index].coordLower) \

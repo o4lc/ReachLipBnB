@@ -7,6 +7,7 @@ from utilities import Plotter
 from BranchAndBoundNode import BB_node
 from Bounding.LipschitzBound import LipschitzBounding
 from Bounding.PgdUpperBound import PgdUpperBound
+from Utilities.Timer import Timers
 
 
 class BranchAndBound:
@@ -14,7 +15,7 @@ class BranchAndBound:
                  inputDimension=2, eps=0.1, network=None, queryCoefficient=None,
                  pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
                  branchingMethod='SimpleBranch', nodeBranchingFactor=2,
-                 scoreFunction='length'):
+                 scoreFunction='length', maximumBatchSize=256):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = None
         self.bestLowerBound = None
@@ -29,11 +30,13 @@ class BranchAndBound:
         self.queryCoefficient = queryCoefficient
         self.lowerBoundClass = LipschitzBounding(network, device)
         self.upperBoundClass = PgdUpperBound(network, pgdNumberOfInitializations, pgdIterNum, pgdStepSize,
-                                             inputDimension, device)
+                                             inputDimension, device, maximumBatchSize)
         self.branchingMethod = branchingMethod
         self.nodeBranchingFactor = nodeBranchingFactor
         self.scoreFunction = scoreFunction
         self.device = device
+        self.maximumBatchSize = maximumBatchSize
+        self.timers = Timers(["lowerBound", "upperBound", "branch"])
 
     def prune(self):
         for node in self.spaceNodes:
@@ -92,8 +95,12 @@ class BranchAndBound:
             return None
 
     def bound(self, indices, parent_ub, parent_lb):
+        self.timers.start("lowerBound")
         lowerBounds = torch.maximum(self.lowerBound(indices), parent_lb)
+        self.timers.pause("lowerBound")
+        self.timers.start("upperBound")
         upperBounds = self.upperBound(indices)
+        self.timers.pause("upperBound")
         for i, index in enumerate(indices):
             self.spaceNodes[index].upper = upperBounds[i]
             self.spaceNodes[index].lower = lowerBounds[i]
@@ -107,7 +114,9 @@ class BranchAndBound:
 
         self.bound([0], self.bestUpperBound, self.bestLowerBound)
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
+            self.timers.start("branch")
             indices, deletedUb, deletedLb = self.branch()
+            self.timers.pause("branch")
             self.bound(indices, deletedUb, deletedLb)
 
             self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
@@ -120,6 +129,8 @@ class BranchAndBound:
 
         if self.verbose:
             plotter.showAnimation()
+        self.timers.pauseAll()
+        self.timers.print()
         return self.bestLowerBound, self.bestUpperBound, self.spaceNodes
 
     def __repr__(self):
