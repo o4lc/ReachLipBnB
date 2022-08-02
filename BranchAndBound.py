@@ -36,7 +36,7 @@ class BranchAndBound:
         self.scoreFunction = scoreFunction
         self.device = device
         self.maximumBatchSize = maximumBatchSize
-        self.timers = Timers(["lowerBound", "upperBound", "branch"])
+        self.timers = Timers(["lowerBound", "upperBound", "branch", "prune", "maxFind", "nodeCreation"])
 
     def prune(self):
         for node in self.spaceNodes:
@@ -55,9 +55,12 @@ class BranchAndBound:
 
     def branch(self):
         # Prunning Function
+        self.timers.start("prune")
         self.prune()
+        self.timers.pause("prune")
 
         if self.branchingMethod == 'SimpleBranch':
+            self.timers.start("maxFind")
             #@TODO Choosing the node to branch -> this parts should be swaped with the sort idea
             maxScore, maxIndex = -1, -1
             for i in range(len(self.spaceNodes)):
@@ -69,7 +72,8 @@ class BranchAndBound:
 
             #@TODO This can be optimized by keeping the best previous 'x's in that space
             node = self.spaceNodes.pop(maxIndex)
-
+            self.timers.pause("maxFind")
+            self.timers.start("nodeCreation")
             # '''
             # @TODO
             # Python Float Calculation Problem
@@ -88,6 +92,7 @@ class BranchAndBound:
                 tempLow[coordToSplit] = newIntervals[i]
                 tempHigh[coordToSplit] = newIntervals[i+1]
                 self.spaceNodes.append(BB_node(np.infty, -np.infty, tempHigh, tempLow, scoreFunction=self.scoreFunction))
+            self.timers.pause("nodeCreation")
             return [len(self.spaceNodes) - j for j in range(1, self.nodeBranchingFactor + 1)], node.upper, node.lower
         
         else:
