@@ -81,7 +81,7 @@ class LipschitzBounding:
                 lipschitzConstants[unavailableBatch] =\
                     self.calculatedLipschitzConstants[locationOfUnavailableConstants[unavailableBatch]][1]
             # print(lipschitzConstants)
-            print(len(self.calculatedLipschitzConstants))
+            # print(len(self.calculatedLipschitzConstants))
         if torch.any(lipschitzConstants < 0):
             print("error. lipschitz constant hasn't been calculated")
             raise

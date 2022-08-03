@@ -7,7 +7,7 @@ from NeuralNetwork import NeuralNetwork
 
 def main():
 
-    eps = 1
+    eps = 0.05
     verbose = 0
 
     if torch.cuda.is_available():
@@ -15,10 +15,13 @@ def main():
     else:
         device = torch.device("cpu")
 
-    # device=torch.device("cpu")
-    # pathToStateDictionary = "Networks/randomNetwork.pth"
+    device=torch.device("cpu")
+    print(device)
+    print(' ')
+
+    pathToStateDictionary = "Networks/randomNetwork.pth"
     # pathToStateDictionary = "Networks/randomNetwork2.pth"
-    pathToStateDictionary = "Networks/trainedNetwork1.pth"
+    # pathToStateDictionary = "Networks/trainedNetwork1.pth"
     network = NeuralNetwork(pathToStateDictionary)
     dim = network.Linear[0].weight.shape[1]
 
@@ -30,14 +33,15 @@ def main():
 
     startTime = time.time()
     BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
-                        queryCoefficient=c, device=device, nodeBranchingFactor=2, scoreFunction='length',
+                        queryCoefficient=c, device=device, nodeBranchingFactor=4, branchNodeNum = 2,
+                        scoreFunction='volume',
                         pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5)
     lowerBound, upperBound, space_left = BB.run()
     endTime = time.time()
 
     if verbose:
         print(BB)
-
+    print(' ')
     print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
     print('The algorithm took (s):', endTime - startTime, 'with eps =', eps)
     

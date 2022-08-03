@@ -1,4 +1,4 @@
-from tabnanny import verbose
+# from tabnanny import verbose
 
 import torch
 
@@ -14,8 +14,7 @@ class BranchAndBound:
     def __init__(self, coordUp=None, coordLow=None, verbose=False, pgdStepSize=1e-3,
                  inputDimension=2, eps=0.1, network=None, queryCoefficient=None,
                  pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
-                 maximumBatchSize=256,
-                 branchingMethod='SimpleBranch', nodeBranchingFactor=2, branchNodeNum = 1,
+                 maximumBatchSize=256,  nodeBranchingFactor=2, branchNodeNum = 1,
                  scoreFunction='length'):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = None
@@ -32,7 +31,6 @@ class BranchAndBound:
         self.lowerBoundClass = LipschitzBounding(network, device)
         self.upperBoundClass = PgdUpperBound(network, pgdNumberOfInitializations, pgdIterNum, pgdStepSize,
                                              inputDimension, device, maximumBatchSize)
-        self.branchingMethod = branchingMethod
         self.nodeBranchingFactor = nodeBranchingFactor
         self.scoreFunction = scoreFunction
         self.branchNodeNum = branchNodeNum
@@ -66,27 +64,36 @@ class BranchAndBound:
         self.timers.start("prune")
         self.prune()
         self.timers.pause("prune")
-        print(len(self.spaceNodes))
+        numNodesAfterPrune = len(self.spaceNodes)
 
-        # if self.branchMethod == 'SimpleBranch':
         self.timers.start("maxFind")
         #@TODO Choosing the node to branch -> this parts should be swaped with the sort idea
         scoreArray = torch.Tensor([self.spaceNodes[i].score for i in range(len(self.spaceNodes))])
         scoreArraySorted = torch.argsort(scoreArray)
-        maxIndeces = scoreArraySorted[len(scoreArraySorted) - 1: len(scoreArraySorted) - self.branchNodeNum + 1]
+        if len(self.spaceNodes) > self.branchNodeNum:
+            maxIndices = scoreArraySorted[len(scoreArraySorted) - self.branchNodeNum : len(scoreArraySorted)]
+        else:
+            maxIndices = scoreArraySorted[:]
         self.timers.pause("maxFind")
 
         deletedUpperBounds = []
         deletedLowerBounds = []
-        for maxIndex in maxIndeces:
+        nodes = []
+        maxIndices, __ = torch.sort(maxIndices, descending=True)
+        # print('\n\n\n', maxIndices, scoreArray, scoreArraySorted)
+        for maxIndex in maxIndices:
+            node = self.spaceNodes.pop(maxIndex)
+            nodes.append(node)
+            deletedUpperBounds.append(node.upper)
+            deletedLowerBounds.append(node.lower)
+  
+        for j in range(len(nodes)):
             self.timers.start("nodeCreation")
-            coordToSplitSorted = torch.argsort(self.spaceNodes[maxIndex].coordUpper - self.spaceNodes[maxIndex].coordLower)
+            coordToSplitSorted = torch.argsort(nodes[j].coordUpper - nodes[j].coordLower)
             coordToSplit = coordToSplitSorted[len(coordToSplitSorted) - 1]
 
             #@TODO This can be optimized by keeping the best previous 'x's in that space
-            node = self.spaceNodes.pop(maxIndex)
-            deletedUpperBounds.append(node.upper)
-            deletedLowerBounds.append(node.lower)
+            node = nodes[j]
 
 
             # '''
@@ -109,12 +116,14 @@ class BranchAndBound:
                 tempLow[coordToSplit] = newIntervals[i]
                 tempHigh[coordToSplit] = newIntervals[i+1]
                 self.spaceNodes.append(BB_node(np.infty, -np.infty, tempHigh, tempLow, scoreFunction=self.scoreFunction))
+
             self.timers.pause("nodeCreation")
-            return [len(self.spaceNodes) - j for j in range(1, self.nodeBranchingFactor + 1)], node.upper, node.lower
         
-        else:
-            print("Not Implemented Yet!")
-            return None
+        numNodesAfterBranch = len(self.spaceNodes)
+        numNodesAdded = numNodesAfterBranch - numNodesAfterPrune + len(maxIndices)
+
+        return [len(self.spaceNodes) - j for j in range(1, numNodesAdded + 1)], deletedUpperBounds, deletedLowerBounds
+
 
     def bound(self, indices, parent_ub, parent_lb):
         self.timers.start("lowerBound")
@@ -139,7 +148,11 @@ class BranchAndBound:
             self.timers.start("branch")
             indices, deletedUb, deletedLb = self.branch()
             self.timers.pause("branch")
-            self.bound(indices, deletedUb, deletedLb)
+
+            # self.bound(indices, deletedUb, deletedLb)
+            for nodeCounter in range(len(deletedUb)): # Because self.branchNodeNum is not always == len(deletedUB)
+                self.bound(indices[self.nodeBranchingFactor * nodeCounter : self.nodeBranchingFactor * (nodeCounter + 1)]
+                        , deletedUb[nodeCounter], deletedLb[nodeCounter])
 
             self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
             self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
