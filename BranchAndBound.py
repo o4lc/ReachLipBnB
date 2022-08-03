@@ -14,8 +14,7 @@ class BranchAndBound:
     def __init__(self, coordUp=None, coordLow=None, verbose=False, pgdStepSize=1e-3,
                  inputDimension=2, eps=0.1, network=None, queryCoefficient=None,
                  pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
-                 branchingMethod='SimpleBranch', nodeBranchingFactor=2,
-                 scoreFunction='length', maximumBatchSize=256,
+                 maximumBatchSize=256,
                  branchingMethod='SimpleBranch', nodeBranchingFactor=2, branchNodeNum = 1,
                  scoreFunction='length'):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
@@ -42,11 +41,17 @@ class BranchAndBound:
         self.timers = Timers(["lowerBound", "upperBound", "branch", "prune", "maxFind", "nodeCreation"])
 
     def prune(self):
-        for node in self.spaceNodes:
-            if node.lower >= self.bestUpperBound:
-                self.spaceNodes.remove(node)
+        # slightly faster since this starts deleting from the end of the list.
+        for i in range(len(self.spaceNodes) - 1, -1, -1):
+            if self.spaceNodes[i].lower >= self.bestUpperBound:
+                self.spaceNodes.pop(i)
                 if self.verbose:
                     print('deleted')
+        # for node in self.spaceNodes:
+        #     if node.lower >= self.bestUpperBound:
+        #         self.spaceNodes.remove(node)
+        #         if self.verbose:
+        #             print('deleted')
 
     def lowerBound(self, indices):
         lowerBounds = torch.vstack([self.spaceNodes[index].coordLower for index in indices])
@@ -61,6 +66,7 @@ class BranchAndBound:
         self.timers.start("prune")
         self.prune()
         self.timers.pause("prune")
+        print(len(self.spaceNodes))
 
         # if self.branchMethod == 'SimpleBranch':
         self.timers.start("maxFind")
