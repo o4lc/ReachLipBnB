@@ -12,27 +12,59 @@ not only the lipschitz constant, but the query coefficient used to calculate the
 we would only need to recalculate the final step m_l for the new query coefficient 
 """
 
+
 class LipschitzBounding:
     def __init__(self,
                  network: nn.Module,
-                 device=torch.device("cuda", 0)):
+                 device=torch.device("cuda", 0),
+                 virtualBranching=False):
         self.network = network
         self.device = device
         self.weights = self.extractWeightsFromNetwork(self.network)
         self.calculatedLipschitzConstants = []
+        self.performVirtualBranching = virtualBranching
 
     def lowerBound(self,
                    queryCoefficient: torch.Tensor,
                    inputLowerBound: torch.Tensor,
-                   inputUpperBound: torch.Tensor):
+                   inputUpperBound: torch.Tensor,
+                   virtualBranch=True):
+        # print(virtualBranch)
+        batchSize = inputUpperBound.shape[0]
+        difference = inputUpperBound - inputLowerBound
+        # print(difference)
+        if virtualBranch and self.performVirtualBranching:
+            numberOfVirtualBranches = 8
+            maxIndices = torch.argmax(difference, 1)
+            newLowers = [inputLowerBound[i, :].clone() for i in range(batchSize)
+                         for _ in range(numberOfVirtualBranches)]
+            newUppers = [inputUpperBound[i, :].clone() for i in range(batchSize)
+                         for _ in range(numberOfVirtualBranches)]
+            for i in range(batchSize):
+                for j in range(numberOfVirtualBranches):
+                    newUppers[numberOfVirtualBranches * i + j][maxIndices[i]] = \
+                        newLowers[numberOfVirtualBranches * i + j][maxIndices[i]] +\
+                        (i + 1) * difference[i, maxIndices[i]] / numberOfVirtualBranches
+                    newLowers[numberOfVirtualBranches * i + j][maxIndices[i]] +=\
+                        i * difference[i, maxIndices[i]] / numberOfVirtualBranches
+
+            newLowers = torch.vstack(newLowers)
+            newUppers = torch.vstack(newUppers)
+            virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False)
+            virtualBranchLowerBounds = torch.Tensor([torch.min(
+                virtualBranchLowerBoundsExtra[i * numberOfVirtualBranches:(i + 1) * numberOfVirtualBranches])
+                for i in range(0, batchSize)])
+            # print("virtual done")
+            # print(virtualBranchLowerBounds)
+
 
         # print("---------"*15)
         # this function is not optimal for cases in which an axis is cut into unequal segments
 
         # I added .float() at the end
-        dilationVector = (inputUpperBound - inputLowerBound) / torch.tensor(2., device=self.device)
+        dilationVector = difference / torch.tensor(2., device=self.device)
         # print(dilationVector)
-        batchSize = dilationVector.shape[0]
+
         batchesThatNeedLipschitzConstantCalculation = [i for i in range(batchSize)]
         lipschitzConstants = -torch.ones(batchSize, device=self.device)
         locationOfUnavailableConstants = {}
@@ -92,6 +124,9 @@ class LipschitzBounding:
             # print(self.network(centerPoint) @ queryCoefficient, lipschitzConstants)
             # if torch.any(lipschitzConstants != lipschitzConstants[0]):
             #     print(lipschitzConstants)
+        if virtualBranch and self.performVirtualBranching:
+            lowerBound = torch.maximum(lowerBound, virtualBranchLowerBounds)
+        # print(lowerBound)
         return lowerBound
 
     @staticmethod

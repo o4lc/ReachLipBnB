@@ -15,7 +15,8 @@ class BranchAndBound:
                  inputDimension=2, eps=0.1, network=None, queryCoefficient=None,
                  pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
                  maximumBatchSize=256,  nodeBranchingFactor=2, branchNodeNum = 1,
-                 scoreFunction='length'):
+                 scoreFunction='length',
+                 virtualBranching=False):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = None
         self.bestLowerBound = None
@@ -28,7 +29,7 @@ class BranchAndBound:
         self.eps = eps
         self.network = network
         self.queryCoefficient = queryCoefficient
-        self.lowerBoundClass = LipschitzBounding(network, device)
+        self.lowerBoundClass = LipschitzBounding(network, device, virtualBranching)
         self.upperBoundClass = PgdUpperBound(network, pgdNumberOfInitializations, pgdIterNum, pgdStepSize,
                                              inputDimension, device, maximumBatchSize)
         self.nodeBranchingFactor = nodeBranchingFactor
