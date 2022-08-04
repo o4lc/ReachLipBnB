@@ -36,7 +36,7 @@ class BranchAndBound:
         self.branchNodeNum = branchNodeNum
         self.device = device
         self.maximumBatchSize = maximumBatchSize
-        self.timers = Timers(["lowerBound", "upperBound", "branch", "prune", "maxFind", "nodeCreation"])
+        self.timers = Timers(["lowerBound", "upperBound", "branch", "prune", "maxFind", "nodeCreation", "bestBound"])
 
     def prune(self):
         # slightly faster since this starts deleting from the end of the list.
@@ -74,7 +74,7 @@ class BranchAndBound:
             maxIndices = scoreArraySorted[len(scoreArraySorted) - self.branchNodeNum : len(scoreArraySorted)]
         else:
             maxIndices = scoreArraySorted[:]
-        self.timers.pause("maxFind")
+
 
         deletedUpperBounds = []
         deletedLowerBounds = []
@@ -86,7 +86,7 @@ class BranchAndBound:
             nodes.append(node)
             deletedUpperBounds.append(node.upper)
             deletedLowerBounds.append(node.lower)
-  
+        self.timers.pause("maxFind")
         for j in range(len(nodes)):
             self.timers.start("nodeCreation")
             coordToSplitSorted = torch.argsort(nodes[j].coordUpper - nodes[j].coordLower)
@@ -132,9 +132,16 @@ class BranchAndBound:
         self.timers.start("upperBound")
         upperBounds = self.upperBound(indices)
         self.timers.pause("upperBound")
+        bestLowerBound = lowerBounds[0]
+        bestUpperBound = upperBounds[0]
         for i, index in enumerate(indices):
             self.spaceNodes[index].upper = upperBounds[i]
             self.spaceNodes[index].lower = lowerBounds[i]
+            if upperBounds[i] < bestUpperBound:
+                bestUpperBound = upperBounds[i]
+            if lowerBounds[i] < bestLowerBound:
+                bestLowerBound = lowerBounds[i]
+        return bestLowerBound, bestUpperBound
 
     def run(self):
         self.bestUpperBound = torch.Tensor([torch.inf]).to(self.device)
@@ -150,12 +157,22 @@ class BranchAndBound:
             self.timers.pause("branch")
 
             # self.bound(indices, deletedUb, deletedLb)
+            bestUpper = torch.Tensor([torch.inf])
+            bestLower = torch.Tensor([torch.inf])
             for nodeCounter in range(len(deletedUb)): # Because self.branchNodeNum is not always == len(deletedUB)
-                self.bound(indices[self.nodeBranchingFactor * nodeCounter : self.nodeBranchingFactor * (nodeCounter + 1)]
-                        , deletedUb[nodeCounter], deletedLb[nodeCounter])
-
-            self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
-            self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
+                newBestLower, newBestUpper = self.bound(
+                    indices[self.nodeBranchingFactor * nodeCounter: self.nodeBranchingFactor * (nodeCounter + 1)]
+                    , deletedUb[nodeCounter], deletedLb[nodeCounter])
+                if newBestLower < bestLower:
+                    bestLower = newBestLower
+                if newBestUpper < bestUpper:
+                    bestUpper = newBestUpper
+            self.bestUpperBound = bestUpper
+            self.bestLowerBound = bestLower
+            # self.timers.start("bestBound")
+            # self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
+            # self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
+            # self.timers.pause("bestBound")
             # print(self.bestUpperBound, self.bestLowerBound)
             if self.verbose:
                 print('Best UB', self.bestLowerBound, 'Best LB', self.bestUpperBound)
