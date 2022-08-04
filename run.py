@@ -7,7 +7,7 @@ from NeuralNetwork import NeuralNetwork
 
 def main():
 
-    eps = 0.000001
+    eps = 0.01
     verbose = 0
 
     if torch.cuda.is_available():
@@ -19,9 +19,9 @@ def main():
     print(device)
     print(' ')
 
-    pathToStateDictionary = "Networks/randomNetwork.pth"
+    # pathToStateDictionary = "Networks/randomNetwork.pth"
     # pathToStateDictionary = "Networks/randomNetwork2.pth"
-    # pathToStateDictionary = "Networks/trainedNetwork1.pth"
+    pathToStateDictionary = "Networks/trainedNetwork1.pth"
     network = NeuralNetwork(pathToStateDictionary)
     dim = network.Linear[0].weight.shape[1]
 

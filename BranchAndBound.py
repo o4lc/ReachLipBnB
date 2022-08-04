@@ -153,7 +153,7 @@ class BranchAndBound:
         if self.verbose:
             plotter = Plotter()
 
-        self.bound([0], self.bestUpperBound, self.bestLowerBound)
+        self.bestLowerBound, self.bestUpperBound = self.bound([0], self.bestUpperBound, self.bestLowerBound)
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
             self.timers.start("branch")
             indices, deletedUb, deletedLb = self.branch()
@@ -162,8 +162,9 @@ class BranchAndBound:
             # self.bestLowerBound, self.bestUpperBound = self.bound(indices, deletedUb, deletedLb)
 
             # self.bound(indices, deletedUb, deletedLb)
-            bestUpper = torch.Tensor([torch.inf])
-            bestLower = torch.Tensor([torch.inf])
+            print(self.bestLowerBound, self.bestUpperBound)
+            bestUpper = self.bestUpperBound.clone()
+            bestLower = self.bestLowerBound.clone()
             for nodeCounter in range(0, len(deletedUb), self.nodeBranchingFactor): # Because self.branchNodeNum is not always == len(deletedUB)
                 newBestLower, newBestUpper = self.bound(
                     indices[nodeCounter: (nodeCounter + 1)]
@@ -172,8 +173,8 @@ class BranchAndBound:
                     bestLower = newBestLower
                 if newBestUpper < bestUpper:
                     bestUpper = newBestUpper
-            self.bestUpperBound = bestUpper
-            self.bestLowerBound = bestLower
+            self.bestUpperBound = torch.minimum(bestUpper, self.bestUpperBound)
+            self.bestLowerBound = torch.maximum(bestLower, self.bestLowerBound)
             # self.timers.start("bestBound")
             # self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
             # self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
