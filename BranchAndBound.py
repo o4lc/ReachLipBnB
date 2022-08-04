@@ -84,8 +84,11 @@ class BranchAndBound:
         for maxIndex in maxIndices:
             node = self.spaceNodes.pop(maxIndex)
             nodes.append(node)
-            deletedUpperBounds.append(node.upper)
-            deletedLowerBounds.append(node.lower)
+            for i in range(self.nodeBranchingFactor):
+                deletedUpperBounds.append(node.upper)
+                deletedLowerBounds.append(node.lower)
+        deletedLowerBounds = torch.Tensor(deletedLowerBounds)
+        deletedUpperBounds = torch.Tensor(deletedUpperBounds)
         self.timers.pause("maxFind")
         for j in range(len(nodes)):
             self.timers.start("nodeCreation")
@@ -156,12 +159,14 @@ class BranchAndBound:
             indices, deletedUb, deletedLb = self.branch()
             self.timers.pause("branch")
 
+            # self.bestLowerBound, self.bestUpperBound = self.bound(indices, deletedUb, deletedLb)
+
             # self.bound(indices, deletedUb, deletedLb)
             bestUpper = torch.Tensor([torch.inf])
             bestLower = torch.Tensor([torch.inf])
-            for nodeCounter in range(len(deletedUb)): # Because self.branchNodeNum is not always == len(deletedUB)
+            for nodeCounter in range(0, len(deletedUb), self.nodeBranchingFactor): # Because self.branchNodeNum is not always == len(deletedUB)
                 newBestLower, newBestUpper = self.bound(
-                    indices[self.nodeBranchingFactor * nodeCounter: self.nodeBranchingFactor * (nodeCounter + 1)]
+                    indices[nodeCounter: (nodeCounter + 1)]
                     , deletedUb[nodeCounter], deletedLb[nodeCounter])
                 if newBestLower < bestLower:
                     bestLower = newBestLower

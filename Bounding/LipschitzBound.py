@@ -89,8 +89,9 @@ class LipschitzBounding:
         centerPoint = (inputUpperBound + inputLowerBound) / torch.tensor(2., device=self.device)
         with torch.no_grad():
             lowerBound = self.network(centerPoint) @ queryCoefficient - lipschitzConstants
-            print(self.network(centerPoint) @ queryCoefficient, lipschitzConstants)
-
+            # print(self.network(centerPoint) @ queryCoefficient, lipschitzConstants)
+            # if torch.any(lipschitzConstants != lipschitzConstants[0]):
+            #     print(lipschitzConstants)
         return lowerBound
 
     @staticmethod
