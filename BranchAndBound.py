@@ -37,7 +37,8 @@ class BranchAndBound:
         self.branchNodeNum = branchNodeNum
         self.device = device
         self.maximumBatchSize = maximumBatchSize
-        self.timers = Timers(["lowerBound", "upperBound", "branch", "prune", "maxFind", "nodeCreation", "bestBound"])
+        self.timers = Timers(["lowerBound", "upperBound", "branch", "prune", "maxFind", "nodeCreation", "bestBound",
+                              "lipschitzForwardPass", "lipschitzCalc", "lipschitzSearch", "virtualBranchMin"])
 
     def prune(self):
         # slightly faster since this starts deleting from the end of the list.
@@ -55,7 +56,7 @@ class BranchAndBound:
     def lowerBound(self, indices):
         lowerBounds = torch.vstack([self.spaceNodes[index].coordLower for index in indices])
         upperBounds = torch.vstack([self.spaceNodes[index].coordUpper for index in indices])
-        return self.lowerBoundClass.lowerBound(self.queryCoefficient, lowerBounds, upperBounds)
+        return self.lowerBoundClass.lowerBound(self.queryCoefficient, lowerBounds, upperBounds, timer=self.timers)
 
     def upperBound(self, indices):
         return self.upperBoundClass.upperBound(indices, self.spaceNodes, self.queryCoefficient)
@@ -134,6 +135,7 @@ class BranchAndBound:
         self.timers.pause("lowerBound")
         self.timers.start("upperBound")
         upperBounds = self.upperBound(indices)
+        # print(upperBounds)
         self.timers.pause("upperBound")
         for i, index in enumerate(indices):
             self.spaceNodes[index].upper = upperBounds[i]

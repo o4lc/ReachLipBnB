@@ -28,13 +28,14 @@ class LipschitzBounding:
                    queryCoefficient: torch.Tensor,
                    inputLowerBound: torch.Tensor,
                    inputUpperBound: torch.Tensor,
-                   virtualBranch=True):
+                   virtualBranch=True,
+                   timer=None):
         # print(virtualBranch)
         batchSize = inputUpperBound.shape[0]
         difference = inputUpperBound - inputLowerBound
         # print(difference)
         if virtualBranch and self.performVirtualBranching:
-            numberOfVirtualBranches = 8
+            numberOfVirtualBranches = 4
             maxIndices = torch.argmax(difference, 1)
             newLowers = [inputLowerBound[i, :].clone() for i in range(batchSize)
                          for _ in range(numberOfVirtualBranches)]
@@ -50,10 +51,12 @@ class LipschitzBounding:
 
             newLowers = torch.vstack(newLowers)
             newUppers = torch.vstack(newUppers)
-            virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False)
+            virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False, timer=timer)
+            timer.start("virtualBranchMin")
             virtualBranchLowerBounds = torch.Tensor([torch.min(
                 virtualBranchLowerBoundsExtra[i * numberOfVirtualBranches:(i + 1) * numberOfVirtualBranches])
                 for i in range(0, batchSize)])
+            timer.pause("virtualBranchMin")
             # print("virtual done")
             # print(virtualBranchLowerBounds)
 
@@ -65,22 +68,34 @@ class LipschitzBounding:
         dilationVector = difference / torch.tensor(2., device=self.device)
         # print(dilationVector)
 
+        timer.start("lipschitzSearch")
         batchesThatNeedLipschitzConstantCalculation = [i for i in range(batchSize)]
         lipschitzConstants = -torch.ones(batchSize, device=self.device)
         locationOfUnavailableConstants = {}
+        previousDilation = None
         for batchCounter in range(batchSize):  # making it reversed might just help a tiny amount.
             foundLipschitzConstant = False
-            for i in range(len(self.calculatedLipschitzConstants)):
-                existingDilationVector, lipschitzConstant = self.calculatedLipschitzConstants[i]
-                if torch.norm(dilationVector[batchCounter, :] - existingDilationVector) < 1e-8:
-                    if lipschitzConstant == -1:
-                        locationOfUnavailableConstants[batchCounter] = i
+            if previousDilation is not None:
+                if torch.norm(dilationVector[batchCounter, :] - previousDilation) < 1e-8:
+                    if previousLipschitzConstant == -1:
+                        locationOfUnavailableConstants[batchCounter] = len(self.calculatedLipschitzConstants) - 1
                     else:
-                        lipschitzConstants[batchCounter] = lipschitzConstant
+                        lipschitzConstants[batchCounter] = previousLipschitzConstant
                     batchesThatNeedLipschitzConstantCalculation.remove(batchCounter)
                     foundLipschitzConstant = True
+            if not foundLipschitzConstant:
+                for i in range(len(self.calculatedLipschitzConstants) - 1, -1, -1):
+                    existingDilationVector, lipschitzConstant = self.calculatedLipschitzConstants[i]
+                    if torch.norm(dilationVector[batchCounter, :] - existingDilationVector) < 1e-8:
+                        previousLipschitzConstant = lipschitzConstant
+                        if lipschitzConstant == -1:
+                            locationOfUnavailableConstants[batchCounter] = i
+                        else:
+                            lipschitzConstants[batchCounter] = lipschitzConstant
+                        batchesThatNeedLipschitzConstantCalculation.remove(batchCounter)
+                        foundLipschitzConstant = True
 
-                    break
+                        break
             if not foundLipschitzConstant:
                 locationOfUnavailableConstants[batchCounter] = len(self.calculatedLipschitzConstants)
                 # suppose we divide equally along an axes. Then the lipschitz constant of the two subdomains are gonna
@@ -89,6 +104,8 @@ class LipschitzBounding:
                 self.calculatedLipschitzConstants.append((dilationVector[batchCounter, :], -1))
         # print(self.calculatedLipschitzConstants)
         # print(batchesThatNeedLipschitzConstantCalculation)
+        timer.pause("lipschitzSearch")
+        timer.start("lipschitzCalc")
         if len(batchesThatNeedLipschitzConstantCalculation) != 0:
             # print("running lipschitz calculations")
             # dMatrix = torch.diag(dilationVector)
@@ -114,13 +131,16 @@ class LipschitzBounding:
                     self.calculatedLipschitzConstants[locationOfUnavailableConstants[unavailableBatch]][1]
             # print(lipschitzConstants)
             # print(len(self.calculatedLipschitzConstants))
+        timer.pause("lipschitzCalc")
         if torch.any(lipschitzConstants < 0):
             print("error. lipschitz constant hasn't been calculated")
             raise
 
         centerPoint = (inputUpperBound + inputLowerBound) / torch.tensor(2., device=self.device)
         with torch.no_grad():
+            timer.start("lipschitzForwardPass")
             lowerBound = self.network(centerPoint) @ queryCoefficient - lipschitzConstants
+            timer.pause("lipschitzForwardPass")
             # print(self.network(centerPoint) @ queryCoefficient, lipschitzConstants)
             # if torch.any(lipschitzConstants != lipschitzConstants[0]):
             #     print(lipschitzConstants)

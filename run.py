@@ -7,7 +7,7 @@ from NeuralNetwork import NeuralNetwork
 
 def main():
 
-    eps = 1
+    eps = .00001
     verbose = 0
     virtualBranching = True
 
@@ -21,8 +21,8 @@ def main():
     print(' ')
 
     # pathToStateDictionary = "Networks/randomNetwork.pth"
-    pathToStateDictionary = "Networks/randomNetwork2.pth"
-    # pathToStateDictionary = "Networks/trainedNetwork1.pth"
+    # pathToStateDictionary = "Networks/randomNetwork2.pth"
+    pathToStateDictionary = "Networks/trainedNetwork1.pth"
     network = NeuralNetwork(pathToStateDictionary)
     dim = network.Linear[0].weight.shape[1]
 
@@ -34,9 +34,9 @@ def main():
 
     startTime = time.time()
     BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
-                        queryCoefficient=c, device=device, nodeBranchingFactor=4, branchNodeNum = 2,
+                        queryCoefficient=c, device=device, nodeBranchingFactor=4, branchNodeNum=128,
                         scoreFunction='volume',
-                        pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5, virtualBranching=virtualBranching)
+                        pgdIterNum=0, pgdNumberOfInitializations=4, pgdStepSize=0.5, virtualBranching=virtualBranching)
     lowerBound, upperBound, space_left = BB.run()
     endTime = time.time()
 
