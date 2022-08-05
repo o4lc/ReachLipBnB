@@ -26,8 +26,8 @@ class PgdUpperBound:
 
     def upperBoundViaRandomPoints(self, indices, nodes, queryCoefficient):
         currentBatchSize = len(indices) * self.pgdNumberOfInitializations
-        multiplier = torch.zeros(currentBatchSize, self.inputDimension)
-        bias = torch.zeros(currentBatchSize, self.inputDimension)
+        multiplier = torch.zeros(currentBatchSize, self.inputDimension, device=self.device)
+        bias = torch.zeros(currentBatchSize, self.inputDimension, device=self.device)
 
         for i, index in enumerate(indices):
             offset = self.pgdNumberOfInitializations * i

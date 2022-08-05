@@ -89,8 +89,8 @@ class BranchAndBound:
             for i in range(self.nodeBranchingFactor):
                 deletedUpperBounds.append(node.upper)
                 deletedLowerBounds.append(node.lower)
-        deletedLowerBounds = torch.Tensor(deletedLowerBounds)
-        deletedUpperBounds = torch.Tensor(deletedUpperBounds)
+        deletedLowerBounds = torch.Tensor(deletedLowerBounds).to(self.device)
+        deletedUpperBounds = torch.Tensor(deletedUpperBounds).to(self.device)
         self.timers.pause("maxFind")
         for j in range(len(nodes)):
             self.timers.start("nodeCreation")

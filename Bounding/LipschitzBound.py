@@ -55,7 +55,7 @@ class LipschitzBounding:
             timer.start("virtualBranchMin")
             virtualBranchLowerBounds = torch.Tensor([torch.min(
                 virtualBranchLowerBoundsExtra[i * numberOfVirtualBranches:(i + 1) * numberOfVirtualBranches])
-                for i in range(0, batchSize)])
+                for i in range(0, batchSize)]).to(self.device)
             timer.pause("virtualBranchMin")
             # print("virtual done")
             # print(virtualBranchLowerBounds)
