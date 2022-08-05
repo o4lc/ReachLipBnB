@@ -34,7 +34,7 @@ class LipschitzBounding:
         difference = inputUpperBound - inputLowerBound
         # print(difference)
         if virtualBranch and self.performVirtualBranching:
-            numberOfVirtualBranches = 8
+            numberOfVirtualBranches = 4
             maxIndices = torch.argmax(difference, 1)
             newLowers = [inputLowerBound[i, :].clone() for i in range(batchSize)
                          for _ in range(numberOfVirtualBranches)]
@@ -53,7 +53,7 @@ class LipschitzBounding:
             virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False)
             virtualBranchLowerBounds = torch.Tensor([torch.min(
                 virtualBranchLowerBoundsExtra[i * numberOfVirtualBranches:(i + 1) * numberOfVirtualBranches])
-                for i in range(0, batchSize)])
+                for i in range(0, batchSize)]).to(self.device)
             # print("virtual done")
             # print(virtualBranchLowerBounds)
 
