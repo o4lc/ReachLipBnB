@@ -36,7 +36,7 @@ def main():
     BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
                         queryCoefficient=c, device=device, nodeBranchingFactor=4, branchNodeNum=128,
                         scoreFunction='volume',
-                        pgdIterNum=0, pgdNumberOfInitializations=4, pgdStepSize=0.5, virtualBranching=virtualBranching)
+                        pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5, virtualBranching=virtualBranching)
     lowerBound, upperBound, space_left = BB.run()
     endTime = time.time()
 

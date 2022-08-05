@@ -35,6 +35,7 @@ class LipschitzBounding:
         difference = inputUpperBound - inputLowerBound
         # print(difference)
         if virtualBranch and self.performVirtualBranching:
+            timer.start("virtualBranchPreparation")
             numberOfVirtualBranches = 4
             maxIndices = torch.argmax(difference, 1)
             newLowers = [inputLowerBound[i, :].clone() for i in range(batchSize)
@@ -51,6 +52,7 @@ class LipschitzBounding:
 
             newLowers = torch.vstack(newLowers)
             newUppers = torch.vstack(newUppers)
+            timer.pause("virtualBranchPreparation")
             virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False, timer=timer)
             timer.start("virtualBranchMin")
             virtualBranchLowerBounds = torch.Tensor([torch.min(
@@ -72,17 +74,17 @@ class LipschitzBounding:
         batchesThatNeedLipschitzConstantCalculation = [i for i in range(batchSize)]
         lipschitzConstants = -torch.ones(batchSize, device=self.device)
         locationOfUnavailableConstants = {}
-        previousDilation = None
+        # previousDilation = None
         for batchCounter in range(batchSize):  # making it reversed might just help a tiny amount.
             foundLipschitzConstant = False
-            if previousDilation is not None:
-                if torch.norm(dilationVector[batchCounter, :] - previousDilation) < 1e-8:
-                    if previousLipschitzConstant == -1:
-                        locationOfUnavailableConstants[batchCounter] = len(self.calculatedLipschitzConstants) - 1
-                    else:
-                        lipschitzConstants[batchCounter] = previousLipschitzConstant
-                    batchesThatNeedLipschitzConstantCalculation.remove(batchCounter)
-                    foundLipschitzConstant = True
+            # if previousDilation is not None:
+            #     if torch.norm(dilationVector[batchCounter, :] - previousDilation) < 1e-8:
+            #         if previousLipschitzConstant == -1:
+            #             locationOfUnavailableConstants[batchCounter] = len(self.calculatedLipschitzConstants) - 1
+            #         else:
+            #             lipschitzConstants[batchCounter] = previousLipschitzConstant
+            #         batchesThatNeedLipschitzConstantCalculation.remove(batchCounter)
+            #         foundLipschitzConstant = True
             if not foundLipschitzConstant:
                 for i in range(len(self.calculatedLipschitzConstants) - 1, -1, -1):
                     existingDilationVector, lipschitzConstant = self.calculatedLipschitzConstants[i]

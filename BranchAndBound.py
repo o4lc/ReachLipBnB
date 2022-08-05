@@ -38,7 +38,8 @@ class BranchAndBound:
         self.device = device
         self.maximumBatchSize = maximumBatchSize
         self.timers = Timers(["lowerBound", "upperBound", "branch", "prune", "maxFind", "nodeCreation", "bestBound",
-                              "lipschitzForwardPass", "lipschitzCalc", "lipschitzSearch", "virtualBranchMin"])
+                              "lipschitzForwardPass", "lipschitzCalc", "lipschitzSearch", "virtualBranchMin",
+                              "virtualBranchPreparation"])
 
     def prune(self):
         # slightly faster since this starts deleting from the end of the list.
