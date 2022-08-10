@@ -4,7 +4,7 @@ from packages import *
 class NeuralNetwork(nn.Module):
     def __init__(self, path):
         super().__init__()
-        stateDictionary = torch.load(path)
+        stateDictionary = torch.load(path, map_location=torch.device("cpu"))
         layers = []
         for keyEntry in stateDictionary:
             if "weight" in keyEntry:
@@ -17,7 +17,7 @@ class NeuralNetwork(nn.Module):
         self.load_state_dict(stateDictionary)
 
     def load(self, path):
-        stateDict = torch.load(path)
+        stateDict = torch.load(path, map_location=torch.device("cpu"))
         self.load_state_dict(stateDict)
 
     # @TODO

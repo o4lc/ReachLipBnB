@@ -26,17 +26,22 @@ class PgdUpperBound:
 
     def upperBoundViaRandomPoints(self, indices, nodes, queryCoefficient):
         currentBatchSize = len(indices) * self.pgdNumberOfInitializations
-        multiplier = torch.zeros(currentBatchSize, self.inputDimension, device=self.device)
-        bias = torch.zeros(currentBatchSize, self.inputDimension, device=self.device)
+        # multiplier = torch.zeros(currentBatchSize, self.inputDimension, device=self.device)
+        # bias = torch.zeros(currentBatchSize, self.inputDimension, device=self.device)
+        #
+        # for i, index in enumerate(indices):
+        #     offset = self.pgdNumberOfInitializations * i
+        #     multiplier[offset: offset + self.pgdNumberOfInitializations, :] =\
+        #         nodes[index].coordUpper - nodes[index].coordLower
+        #     bias[offset: offset + self.pgdNumberOfInitializations, :] = nodes[index].coordLower
+        # x = multiplier \
+        #     * torch.rand(currentBatchSize, self.inputDimension, device=self.device) \
+        #     + bias
 
-        for i, index in enumerate(indices):
-            offset = self.pgdNumberOfInitializations * i
-            multiplier[offset: offset + self.pgdNumberOfInitializations, :] =\
-                nodes[index].coordUpper - nodes[index].coordLower
-            bias[offset: offset + self.pgdNumberOfInitializations, :] = nodes[index].coordLower
-        x = multiplier \
-            * torch.rand(currentBatchSize, self.inputDimension, device=self.device) \
-            + bias
+        ub = torch.vstack([nodes[i].coordUpper for i in indices])
+        lb = torch.vstack([nodes[i].coordLower for i in indices])
+        x = (ub + lb) / 2
+
         if currentBatchSize > self.maximumBatchSize:
             y = torch.zeros(currentBatchSize)
             i = 0

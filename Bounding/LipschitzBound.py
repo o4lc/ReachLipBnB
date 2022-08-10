@@ -46,9 +46,9 @@ class LipschitzBounding:
                 for j in range(numberOfVirtualBranches):
                     newUppers[numberOfVirtualBranches * i + j][maxIndices[i]] = \
                         newLowers[numberOfVirtualBranches * i + j][maxIndices[i]] +\
-                        (i + 1) * difference[i, maxIndices[i]] / numberOfVirtualBranches
+                        (j + 1) * difference[i, maxIndices[i]] / numberOfVirtualBranches
                     newLowers[numberOfVirtualBranches * i + j][maxIndices[i]] +=\
-                        i * difference[i, maxIndices[i]] / numberOfVirtualBranches
+                        j * difference[i, maxIndices[i]] / numberOfVirtualBranches
 
             newLowers = torch.vstack(newLowers)
             newUppers = torch.vstack(newUppers)
