@@ -122,11 +122,8 @@ class BranchAndBound:
                 tempLow[coordToSplit] = newIntervals[i]
                 tempHigh[coordToSplit] = newIntervals[i+1]
                 self.spaceNodes.append(BB_node(np.infty, -np.infty, tempHigh, tempLow, scoreFunction=self.scoreFunction))
-                """
-                TODO: make this high dimensional
-                """
-                if tempHigh[0] - tempLow[0] < 1e-8 or tempHigh[1] - tempLow[1] < 1e-8:
 
+                if torch.any(tempHigh - tempLow < 1e-8):
                     self.spaceNodes[-1].score = -1
             self.timers.pause("nodeCreation")
         
@@ -162,9 +159,9 @@ class BranchAndBound:
 
             self.bound(indices, deletedUb, deletedLb)
             self.timers.start("bestBound")
-            """
+
             # TODO: make this better by keeping the previous one.
-            """
+
             self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
             self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
             self.timers.pause("bestBound")
