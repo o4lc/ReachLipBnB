@@ -127,8 +127,8 @@ class LipschitzBounding:
                 lipschitzConstants[unavailableBatch] =\
                     self.calculatedLipschitzConstants[locationOfUnavailableConstants[unavailableBatch]][1]
 
-            if len(batchesThatNeedLipschitzConstantCalculation) != 1:
-                print(dilationVector[batchesThatNeedLipschitzConstantCalculation, :])
+            # if len(batchesThatNeedLipschitzConstantCalculation) != 1:
+            #     print(dilationVector[batchesThatNeedLipschitzConstantCalculation, :])
         timer.pause("lipschitzCalc")
         if torch.any(lipschitzConstants < 0):
             print("error. lipschitz constant hasn't been calculated")

@@ -101,7 +101,7 @@ class BranchAndBound:
             self.timers.start("nodeCreation")
             coordToSplitSorted = torch.argsort(nodes[j].coordUpper - nodes[j].coordLower)
             coordToSplit = coordToSplitSorted[len(coordToSplitSorted) - 1]
-
+            # print(coordToSplit)
             #@TODO This can be optimized by keeping the best previous 'x's in that space
             node = nodes[j]
 
