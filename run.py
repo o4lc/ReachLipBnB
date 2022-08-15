@@ -4,12 +4,13 @@ from packages import *
 
 from BranchAndBound import BranchAndBound
 from NeuralNetwork import NeuralNetwork
+torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .00001
+    eps = .0001
     verbose = 0
-    virtualBranching = False
+    virtualBranching = True
 
     if torch.cuda.is_available():
         device = torch.device("cuda", 0)
@@ -23,7 +24,7 @@ def main():
     # pathToStateDictionary = "Networks/randomNetwork.pth"
     # pathToStateDictionary = "Networks/randomNetwork2.pth"
     pathToStateDictionary = "Networks/trainedNetwork1.pth"
-    pathToStateDictionary = "Networks/RobotArmStateDic.pth"
+    # pathToStateDictionary = "Networks/RobotArmStateDic.pth"
     network = NeuralNetwork(pathToStateDictionary)
     dim = network.Linear[0].weight.shape[1]
 
@@ -37,8 +38,8 @@ def main():
 
     startTime = time.time()
     BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
-                        queryCoefficient=c, device=device, nodeBranchingFactor=4, branchNodeNum=128,
-                        scoreFunction='volume',
+                        queryCoefficient=c, device=device, nodeBranchingFactor=4, branchNodeNum=512,
+                        scoreFunction='length',
                         pgdIterNum=0, pgdNumberOfInitializations=1, pgdStepSize=0.5, virtualBranching=virtualBranching)
     lowerBound, upperBound, space_left = BB.run()
     endTime = time.time()

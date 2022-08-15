@@ -37,9 +37,12 @@ class BranchAndBound:
         self.branchNodeNum = branchNodeNum
         self.device = device
         self.maximumBatchSize = maximumBatchSize
-        self.timers = Timers(["lowerBound", "upperBound", "branch", "prune", "maxFind", "nodeCreation", "bestBound",
-                              "lipschitzForwardPass", "lipschitzCalc", "lipschitzSearch", "virtualBranchMin",
-                              "virtualBranchPreparation"])
+        self.timers = Timers(["lowerBound", "lipschitzForwardPass", "lipschitzCalc", "lipschitzSearch",
+                              "virtualBranchPreparation", "virtualBranchMin",
+                              "upperBound",
+                              "bestBound",
+                              "branch", "prune", "maxFind", "nodeCreation",
+                              ])
 
     def prune(self):
         # slightly faster since this starts deleting from the end of the list.
@@ -87,13 +90,14 @@ class BranchAndBound:
         for maxIndex in maxIndices:
             node = self.spaceNodes.pop(maxIndex)
             nodes.append(node)
+            # print("!!!", maxIndex, node.upper, node.lower)
             for i in range(self.nodeBranchingFactor):
                 deletedUpperBounds.append(node.upper)
                 deletedLowerBounds.append(node.lower)
         deletedLowerBounds = torch.Tensor(deletedLowerBounds).to(self.device)
         deletedUpperBounds = torch.Tensor(deletedUpperBounds).to(self.device)
         self.timers.pause("maxFind")
-        for j in range(len(nodes)):
+        for j in range(len(nodes) - 1, -1, -1):
             self.timers.start("nodeCreation")
             coordToSplitSorted = torch.argsort(nodes[j].coordUpper - nodes[j].coordLower)
             coordToSplit = coordToSplitSorted[len(coordToSplitSorted) - 1]
@@ -133,11 +137,16 @@ class BranchAndBound:
         return [len(self.spaceNodes) - j for j in range(1, numNodesAdded + 1)], deletedUpperBounds, deletedLowerBounds
 
     def bound(self, indices, parent_ub, parent_lb):
+
         self.timers.start("lowerBound")
         lowerBounds = torch.maximum(self.lowerBound(indices), parent_lb)
+        # print("Start bounds" + "--------" * 15)
+        # print("## LOWER BOUNDS ", lowerBounds)
         self.timers.pause("lowerBound")
         self.timers.start("upperBound")
         upperBounds = self.upperBound(indices)
+        # print("## UPPER BOUNDS ", upperBounds)
+        # print("End bounds" + "--------" * 15)
         # print(upperBounds)
         self.timers.pause("upperBound")
         for i, index in enumerate(indices):
@@ -153,8 +162,19 @@ class BranchAndBound:
 
         self.bound([0], self.bestUpperBound, self.bestLowerBound)
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
+
+            for i in range(len(self.spaceNodes)):
+                if self.spaceNodes[i].lower > self.spaceNodes[i].upper:
+                    print("@@: ", i, self.spaceNodes[i].lower, self.spaceNodes[i].upper)
+                    raise
             self.timers.start("branch")
             indices, deletedUb, deletedLb = self.branch()
+            # print(indices, end=" ")
+            # print("------", end=" ")
+            # print(deletedUb, end=" ** ** ")
+            # print(deletedLb)
+            # print([self.spaceNodes[i].coordLower for i in indices])
+            # print([self.spaceNodes[i].coordUpper for i in indices])
             self.timers.pause("branch")
 
             self.bound(indices, deletedUb, deletedLb)
@@ -165,8 +185,10 @@ class BranchAndBound:
             self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
             self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
             self.timers.pause("bestBound")
+            #1.08618
+            # print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound, "diff", self.bestUpperBound - self.bestLowerBound)
             if self.verbose:
-                print('Best UB', self.bestLowerBound, 'Best LB', self.bestUpperBound)
+                print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound)
                 plotter.plotSpace(self.spaceNodes, self.initCoordLow, self.initCoordUp)
                 print('--------------------')
 
@@ -174,6 +196,7 @@ class BranchAndBound:
             plotter.showAnimation()
         self.timers.pauseAll()
         self.timers.print()
+        print("number of calculated lipschitz constants ", len(self.lowerBoundClass.calculatedLipschitzConstants))
         return self.bestLowerBound, self.bestUpperBound, self.spaceNodes
 
     def __repr__(self):
@@ -183,4 +206,6 @@ class BranchAndBound:
             string += "\n"
 
         return string
+
+
         
