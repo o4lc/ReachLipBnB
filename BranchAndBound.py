@@ -162,7 +162,7 @@ class BranchAndBound:
 
         self.bound([0], self.bestUpperBound, self.bestLowerBound)
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
-
+            print(len(self.spaceNodes))
             for i in range(len(self.spaceNodes)):
                 if self.spaceNodes[i].lower > self.spaceNodes[i].upper:
                     print("@@: ", i, self.spaceNodes[i].lower, self.spaceNodes[i].upper)
@@ -186,7 +186,7 @@ class BranchAndBound:
             self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
             self.timers.pause("bestBound")
             #1.08618
-            # print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound, "diff", self.bestUpperBound - self.bestLowerBound)
+            print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound, "diff", self.bestUpperBound - self.bestLowerBound)
             if self.verbose:
                 print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound)
                 plotter.plotSpace(self.spaceNodes, self.initCoordLow, self.initCoordUp)
