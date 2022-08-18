@@ -69,12 +69,12 @@ class BranchAndBound:
 
     def branch(self):
         # Prunning Function
-        self.timers.start("prune")
+        self.timers.start("branch:prune")
         self.prune()
-        self.timers.pause("prune")
+        self.timers.pause("branch:prune")
         numNodesAfterPrune = len(self.spaceNodes)
 
-        self.timers.start("maxFind")
+        self.timers.start("branch:maxFind")
         #@TODO Choosing the node to branch -> this parts should be swaped with the sort idea
         scoreArray = torch.Tensor([self.spaceNodes[i].score for i in range(len(self.spaceNodes))])
         scoreArraySorted = torch.argsort(scoreArray)
@@ -98,9 +98,9 @@ class BranchAndBound:
                 deletedLowerBounds.append(node.lower)
         deletedLowerBounds = torch.Tensor(deletedLowerBounds).to(self.device)
         deletedUpperBounds = torch.Tensor(deletedUpperBounds).to(self.device)
-        self.timers.pause("maxFind")
+        self.timers.pause("branch:maxFind")
         for j in range(len(nodes) - 1, -1, -1):
-            self.timers.start("nodeCreation")
+            self.timers.start("branch:nodeCreation")
             coordToSplitSorted = torch.argsort(nodes[j].coordUpper - nodes[j].coordLower)
             coordToSplit = coordToSplitSorted[len(coordToSplitSorted) - 1]
             # print(coordToSplit)
@@ -131,7 +131,7 @@ class BranchAndBound:
 
                 if torch.any(tempHigh - tempLow < 1e-8):
                     self.spaceNodes[-1].score = -1
-            self.timers.pause("nodeCreation")
+            self.timers.pause("branch:nodeCreation")
         
         numNodesAfterBranch = len(self.spaceNodes)
         numNodesAdded = numNodesAfterBranch - numNodesAfterPrune + len(maxIndices)
