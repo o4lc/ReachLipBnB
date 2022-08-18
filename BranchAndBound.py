@@ -37,11 +37,13 @@ class BranchAndBound:
         self.branchNodeNum = branchNodeNum
         self.device = device
         self.maximumBatchSize = maximumBatchSize
-        self.timers = Timers(["lowerBound", "lipschitzForwardPass", "lipschitzCalc", "lipschitzSearch",
-                              "virtualBranchPreparation", "virtualBranchMin",
+        self.timers = Timers(["lowerBound",
+                              "lowerBound:lipschitzForwardPass", "lowerBound:lipschitzCalc",
+                              "lowerBound:lipschitzSearch",
+                              "lowerBound:virtualBranchPreparation", "lowerBound:virtualBranchMin",
                               "upperBound",
                               "bestBound",
-                              "branch", "prune", "maxFind", "nodeCreation",
+                              "branch", "branch:prune", "branch:maxFind", "branch:nodeCreation",
                               ])
 
     def prune(self):
@@ -181,9 +183,11 @@ class BranchAndBound:
             self.timers.start("bestBound")
 
             # TODO: make this better by keeping the previous one.
-
-            self.bestUpperBound = torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))]))
-            self.bestLowerBound = torch.min(torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
+            self.bestUpperBound =\
+                torch.minimum(self.bestUpperBound,
+                              torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))])))
+            self.bestLowerBound = torch.min(
+                torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
             self.timers.pause("bestBound")
             #1.08618
             print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound, "diff", self.bestUpperBound - self.bestLowerBound)

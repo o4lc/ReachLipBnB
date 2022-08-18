@@ -111,12 +111,12 @@ class LipschitzBounding:
             # # Numpy single batch implementation
             # newCalculatedLipschitzConstants = []
             # for i in range(len(batchesThatNeedLipschitzConstantCalculation)):
-            #     newWeights = [w.numpy() for w in self.weights]
+            #     newWeights = [w.cpu().numpy() for w in self.weights]
             #     newWeights[0] = newWeights[0] * dilationVector[batchesThatNeedLipschitzConstantCalculation[i]:
-            #                                                    batchesThatNeedLipschitzConstantCalculation[i] + 1, :].numpy()
-            #     newWeights[-1] = queryCoefficient.unsqueeze(0).numpy() @ newWeights[-1]
+            #                                                    batchesThatNeedLipschitzConstantCalculation[i] + 1, :].cpu().numpy()
+            #     newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
             #     # print(newWeights)
-            #     newCalculatedLipschitzConstants.append(torch.from_numpy(self.calculateLipschitzConstantSingleBatchNumpy(newWeights))[-1])
+            #     newCalculatedLipschitzConstants.append(torch.from_numpy(self.calculateLipschitzConstantSingleBatchNumpy(newWeights))[-1].to(self.device))
 
             """"""
 
@@ -220,9 +220,9 @@ class LipschitzBounding:
         bs = []
         for name, param in self.network.named_parameters():
             if "weight" in name:
-                weights.append(param.detach().clone().numpy())
+                weights.append(param.detach().clone().cpu().numpy())
             if "bias" in name:
-                bs.append(param.detach().clone().unsqueeze(1).numpy())
+                bs.append(param.detach().clone().unsqueeze(1).cpu().numpy())
 
         self.bs = bs
         self.Ws = weights
