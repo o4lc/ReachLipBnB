@@ -26,6 +26,7 @@ class LipschitzBounding:
         self.maxSearchDepth = 10
         self.performVirtualBranching = virtualBranching
         self.extractWeightsForMilp()
+        self.normToUse = 2
 
     def lowerBound(self,
                    queryCoefficient: torch.Tensor,
@@ -63,82 +64,93 @@ class LipschitzBounding:
 
         # this function is not optimal for cases in which an axis is cut into unequal segments
         dilationVector = difference / torch.tensor(2., device=self.device)
+        if self.normToUse == 2 or self.normToUse == 1:
+            if len(self.calculatedLipschitzConstants) == 0:
+                newWeights = [w.cpu().numpy() for w in self.weights]
+                newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
+                lipschitzConstant = torch.from_numpy(
+                    self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(self.device)
+                self.calculatedLipschitzConstants.append(lipschitzConstant)
+            else:
+                lipschitzConstant = self.calculatedLipschitzConstants[0]
+            multipliers = torch.linalg.norm(dilationVector, ord=self.normToUse, dim=1)
+            additiveTerm = lipschitzConstant * multipliers
+        elif self.normToUse == float("inf"):
+            timer.start("lowerBound:lipschitzSearch")
+            batchesThatNeedLipschitzConstantCalculation = [i for i in range(batchSize)]
+            lipschitzConstants = -torch.ones(batchSize, device=self.device)
+            locationOfUnavailableConstants = {}
+            for batchCounter in range(batchSize):  # making it reversed might just help a tiny amount.
+                foundLipschitzConstant = False
+                if not foundLipschitzConstant:
+                    for i in range(len(self.calculatedLipschitzConstants) - 1,
+                                   max(len(self.calculatedLipschitzConstants) - self.maxSearchDepth, -1), -1):
+                        existingDilationVector, lipschitzConstant = self.calculatedLipschitzConstants[i]
+                        # if torch.norm(dilationVector[batchCounter, :] - existingDilationVector) < 1e-8:
+                        if torch.allclose(dilationVector[batchCounter, :], existingDilationVector, rtol=1e-3, atol=1e-7):
+                            if lipschitzConstant == -1:
+                                locationOfUnavailableConstants[batchCounter] = i
+                            else:
+                                lipschitzConstants[batchCounter] = lipschitzConstant
+                            batchesThatNeedLipschitzConstantCalculation.remove(batchCounter)
+                            foundLipschitzConstant = True
+                            break
+                if not foundLipschitzConstant:
+                    locationOfUnavailableConstants[batchCounter] = len(self.calculatedLipschitzConstants)
+                    # suppose we divide equally along an axes. Then the lipschitz constant of the two subdomains are gonna
+                    # be the same. By adding the dilationVector of one of the sides, we are preventing the calculation of
+                    # the lipschitz constant for both sides when they are exactly the same.
+                    self.calculatedLipschitzConstants.append([dilationVector[batchCounter, :], -1])
+            timer.pause("lowerBound:lipschitzSearch")
+            timer.start("lowerBound:lipschitzCalc")
+            if len(batchesThatNeedLipschitzConstantCalculation) != 0:
+                # Incorporate the query coefficient and the dilation matrix into the weights so that the whole problem is a
+                # neural network
+                """"""
+                # Torch batch implementation
+                newWeights = [w.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1) for w in self.weights]
+                # w @ D is equivalent to w * dilationVector
+                # newWeights[0] = newWeights[0] @ dMatrix
+                newWeights[0] = newWeights[0] * dilationVector[batchesThatNeedLipschitzConstantCalculation, :].unsqueeze(1)
+                # print(newWeights[0])
+                queryCoefficientRepeated = queryCoefficient.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1)
+                # newWeights[-1] = queryCoefficient @ newWeights[-1]
 
-        timer.start("lowerBound:lipschitzSearch")
-        batchesThatNeedLipschitzConstantCalculation = [i for i in range(batchSize)]
-        lipschitzConstants = -torch.ones(batchSize, device=self.device)
-        locationOfUnavailableConstants = {}
-        for batchCounter in range(batchSize):  # making it reversed might just help a tiny amount.
-            foundLipschitzConstant = False
-            if not foundLipschitzConstant:
-                for i in range(len(self.calculatedLipschitzConstants) - 1,
-                               max(len(self.calculatedLipschitzConstants) - self.maxSearchDepth, -1), -1):
-                    existingDilationVector, lipschitzConstant = self.calculatedLipschitzConstants[i]
-                    # if torch.norm(dilationVector[batchCounter, :] - existingDilationVector) < 1e-8:
-                    if torch.allclose(dilationVector[batchCounter, :], existingDilationVector, rtol=1e-3, atol=1e-7):
-                        if lipschitzConstant == -1:
-                            locationOfUnavailableConstants[batchCounter] = i
-                        else:
-                            lipschitzConstants[batchCounter] = lipschitzConstant
-                        batchesThatNeedLipschitzConstantCalculation.remove(batchCounter)
-                        foundLipschitzConstant = True
-                        break
-            if not foundLipschitzConstant:
-                locationOfUnavailableConstants[batchCounter] = len(self.calculatedLipschitzConstants)
-                # suppose we divide equally along an axes. Then the lipschitz constant of the two subdomains are gonna
-                # be the same. By adding the dilationVector of one of the sides, we are preventing the calculation of
-                # the lipschitz constant for both sides when they are exactly the same.
-                self.calculatedLipschitzConstants.append([dilationVector[batchCounter, :], -1])
-        timer.pause("lowerBound:lipschitzSearch")
-        timer.start("lowerBound:lipschitzCalc")
-        if len(batchesThatNeedLipschitzConstantCalculation) != 0:
-            # Incorporate the query coefficient and the dilation matrix into the weights so that the whole problem is a
-            # neural network
-            """"""
-            # Torch batch implementation
-            newWeights = [w.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1) for w in self.weights]
-            # w @ D is equivalent to w * dilationVector
-            # newWeights[0] = newWeights[0] @ dMatrix
-            newWeights[0] = newWeights[0] * dilationVector[batchesThatNeedLipschitzConstantCalculation, :].unsqueeze(1)
-            # print(newWeights[0])
-            queryCoefficientRepeated = queryCoefficient.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1)
-            # newWeights[-1] = queryCoefficient @ newWeights[-1]
+                newWeights[-1] = torch.bmm(queryCoefficientRepeated, newWeights[-1])
+                # print(newWeights)
+                newCalculatedLipschitzConstants = self.calculateLipschitzConstant(newWeights, self.device)[:, -1]
+                """"""
+                # # Numpy single batch implementation
+                # newCalculatedLipschitzConstants = []
+                # for i in range(len(batchesThatNeedLipschitzConstantCalculation)):
+                #     newWeights = [w.cpu().numpy() for w in self.weights]
+                #     newWeights[0] = newWeights[0] * dilationVector[batchesThatNeedLipschitzConstantCalculation[i]:
+                #                                                    batchesThatNeedLipschitzConstantCalculation[i] + 1, :].cpu().numpy()
+                #     newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
+                #     # print(newWeights)
+                #     newCalculatedLipschitzConstants.append(torch.from_numpy(self.calculateLipschitzConstantSingleBatchNumpy(newWeights))[-1].to(self.device))
 
-            newWeights[-1] = torch.bmm(queryCoefficientRepeated, newWeights[-1])
-            # print(newWeights)
-            newCalculatedLipschitzConstants = self.calculateLipschitzConstant(newWeights, self.device)[:, -1]
-            """"""
-            # # Numpy single batch implementation
-            # newCalculatedLipschitzConstants = []
-            # for i in range(len(batchesThatNeedLipschitzConstantCalculation)):
-            #     newWeights = [w.cpu().numpy() for w in self.weights]
-            #     newWeights[0] = newWeights[0] * dilationVector[batchesThatNeedLipschitzConstantCalculation[i]:
-            #                                                    batchesThatNeedLipschitzConstantCalculation[i] + 1, :].cpu().numpy()
-            #     newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
-            #     # print(newWeights)
-            #     newCalculatedLipschitzConstants.append(torch.from_numpy(self.calculateLipschitzConstantSingleBatchNumpy(newWeights))[-1].to(self.device))
+                """"""
 
-            """"""
+                for i in range(len(newCalculatedLipschitzConstants)):
+                    self.calculatedLipschitzConstants[locationOfUnavailableConstants[
+                        batchesThatNeedLipschitzConstantCalculation[i]]][1] = newCalculatedLipschitzConstants[i]
+                for unavailableBatch in locationOfUnavailableConstants.keys():
+                    lipschitzConstants[unavailableBatch] =\
+                        self.calculatedLipschitzConstants[locationOfUnavailableConstants[unavailableBatch]][1]
 
-            for i in range(len(newCalculatedLipschitzConstants)):
-                self.calculatedLipschitzConstants[locationOfUnavailableConstants[
-                    batchesThatNeedLipschitzConstantCalculation[i]]][1] = newCalculatedLipschitzConstants[i]
-            for unavailableBatch in locationOfUnavailableConstants.keys():
-                lipschitzConstants[unavailableBatch] =\
-                    self.calculatedLipschitzConstants[locationOfUnavailableConstants[unavailableBatch]][1]
-
-            # if len(batchesThatNeedLipschitzConstantCalculation) != 1:
-            #     print(dilationVector[batchesThatNeedLipschitzConstantCalculation, :])
-        timer.pause("lowerBound:lipschitzCalc")
-        if torch.any(lipschitzConstants < 0):
-            print("error. lipschitz constant hasn't been calculated")
-            raise
+                # if len(batchesThatNeedLipschitzConstantCalculation) != 1:
+                #     print(dilationVector[batchesThatNeedLipschitzConstantCalculation, :])
+            timer.pause("lowerBound:lipschitzCalc")
+            if torch.any(lipschitzConstants < 0):
+                print("error. lipschitz constant hasn't been calculated")
+                raise
+            additiveTerm = lipschitzConstants
 
         centerPoint = (inputUpperBound + inputLowerBound) / torch.tensor(2., device=self.device)
         with torch.no_grad():
             timer.start("lowerBound:lipschitzForwardPass")
-
-            lowerBound = self.network(centerPoint) @ queryCoefficient - lipschitzConstants
+            lowerBound = self.network(centerPoint) @ queryCoefficient - additiveTerm
             timer.pause("lowerBound:lipschitzForwardPass")
 
             # for batchCounter in range(batchSize):
@@ -157,7 +169,8 @@ class LipschitzBounding:
         return lowerBound
 
     @staticmethod
-    def calculateLipschitzConstant(weights: List[torch.Tensor], device=torch.device("cuda", 0)):
+    def calculateLipschitzConstant(weights: List[torch.Tensor], device=torch.device("cuda", 0),
+                                   normToUse=float("inf")):
         """
         :param weights: Weights of the neural network starting from the first layer to the last.
         :return:
@@ -167,7 +180,7 @@ class LipschitzBounding:
 
         halfTensor = torch.tensor(0.5, device=device)
         ms = torch.zeros(batchSize, numberOfWeights, dtype=torch.float).to(device)
-        ms[:, 0] = torch.linalg.norm(weights[0], float('inf'), dim=(1, 2))
+        ms[:, 0] = torch.linalg.norm(weights[0], normToUse, dim=(1, 2))
         for i in range(1, numberOfWeights):
             multiplier = torch.tensor(1., device=device)
             temp = torch.zeros(batchSize).to(device)
@@ -177,17 +190,17 @@ class LipschitzBounding:
                     productMatrix = torch.bmm(productMatrix, weights[k])
                 if j > 0:
                     multiplier *= halfTensor
-                    temp += multiplier * torch.linalg.norm(productMatrix, float('inf'), dim=(1, 2)) * ms[:, j - 1]
+                    temp += multiplier * torch.linalg.norm(productMatrix, normToUse, dim=(1, 2)) * ms[:, j - 1]
                 else:
-                    temp += multiplier * torch.linalg.norm(productMatrix, float('inf'), dim=(1, 2))
+                    temp += multiplier * torch.linalg.norm(productMatrix, normToUse, dim=(1, 2))
             ms[:, i] = temp
         return ms
 
     @staticmethod
-    def calculateLipschitzConstantSingleBatchNumpy(weights):
+    def calculateLipschitzConstantSingleBatchNumpy(weights, normToUse=float("inf")):
         numberOfWeights = len(weights)
         ms = np.zeros(numberOfWeights, dtype=np.float64)
-        ms[0] = np.linalg.norm(weights[0], float('inf'))
+        ms[0] = np.linalg.norm(weights[0], normToUse)
         for i in range(1, numberOfWeights):
             multiplier = 1.
             temp = 0.
@@ -199,9 +212,9 @@ class LipschitzBounding:
                     #     print(weights[k])
                 if j > 0:
                     multiplier *= 0.5
-                    temp += multiplier * np.linalg.norm(productMatrix, float('inf')) * ms[j - 1]
+                    temp += multiplier * np.linalg.norm(productMatrix, normToUse) * ms[j - 1]
                 else:
-                    temp += multiplier * np.linalg.norm(productMatrix, float('inf'))
+                    temp += multiplier * np.linalg.norm(productMatrix, normToUse)
             ms[i] = temp
         # print(ms)
         return ms
