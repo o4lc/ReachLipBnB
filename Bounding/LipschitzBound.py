@@ -118,7 +118,7 @@ class LipschitzBounding:
             timer.start("lowerBound:lipschitzCalc")
             if len(batchesThatNeedLipschitzConstantCalculation) != 0:
                 if self.normToUse == 2:
-                    normalizerDilationVector = torch.sqrt(difference.shape[1] * dilationVector)
+                    normalizerDilationVector = torch.sqrt(difference.shape[1]) * dilationVector
                 else:
                     normalizerDilationVector = dilationVector
                 # Incorporate the query coefficient and the dilation matrix into the weights so that the whole problem is a
