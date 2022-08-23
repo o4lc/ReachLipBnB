@@ -10,7 +10,7 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .0001
+    eps = .000001
     verbose = 0
     virtualBranching = False
 
@@ -29,8 +29,8 @@ def main():
     # pathToStateDictionary = "Networks/trainedNetwork1.pth"
     # pathToStateDictionary = "Networks/RobotArmStateDict2-5-2.pth"
     # pathToStateDictionary = "Networks/Test3-5-3.pth"
-    pathToStateDictionary = "Networks/ACASXU.pth"
-    # pathToStateDictionary = "Networks/mnist_3_50.pth"
+    # pathToStateDictionary = "Networks/ACASXU.pth"
+    pathToStateDictionary = "Networks/mnist_3_50.pth"
 
     network = NeuralNetwork(pathToStateDictionary)
 
@@ -39,31 +39,33 @@ def main():
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
 
-    # lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
-    # upperCoordinate = torch.Tensor([1., 1.]).to(device)
+    lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
+    upperCoordinate = torch.Tensor([1., 1.]).to(device)
+    c = torch.Tensor([1., 2.]).to(device)
+
     # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3, torch.pi / 3]).to(device)
     # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
-    # c = torch.Tensor([1., 2.]).to(device)
-    # lowerCoordinate = torch.Tensor([-2./2560] * dim).to(device)
-    # upperCoordinate = torch.Tensor([2./2560] * dim).to(device)
-    lowerCoordinate = torch.Tensor([-1.] * dim).to(device)
-    upperCoordinate = torch.Tensor([1.] * dim).to(device)
-    c = torch.ones(outputDim).to(device)
-    # c = torch.zeros(outputDim, dtype=torch.float).to(device)
-    # if "mnist" in pathToStateDictionary:
-    #     df = pd.read_csv("mnistTestData.csv")
-    #     testImage = torch.Tensor(df.loc[0].to_numpy()[1:]/255.).to(device)
-    #     lowerCoordinate += testImage
-    #     upperCoordinate += testImage
-    #     testLabel = df.loc[0].label
-    #     c[testLabel] = 1.
-    #     try:
-    #         c[testLabel + 1] = -1
-    #     except:
-    #         c[testLabel - 1] = -1
-    # else:
-    #     c[0] = 1.
-    #     c[1] = -1
+    if "ACAS" in pathToStateDictionary or "mnist" in pathToStateDictionary:
+        lowerCoordinate = torch.Tensor([-2./2560] * dim).to(device)
+        upperCoordinate = torch.Tensor([2./2560] * dim).to(device)
+        # lowerCoordinate = torch.Tensor([-1.] * dim).to(device)
+        # upperCoordinate = torch.Tensor([1.] * dim).to(device)
+        # c = torch.ones(outputDim).to(device)
+        c = torch.zeros(outputDim, dtype=torch.float).to(device)
+        if "mnist" in pathToStateDictionary:
+            df = pd.read_csv("mnistTestData.csv")
+            testImage = torch.Tensor(df.loc[0].to_numpy()[1:]/255.).to(device)
+            lowerCoordinate += testImage
+            upperCoordinate += testImage
+            testLabel = df.loc[0].label
+            c[testLabel] = 1.
+            try:
+                c[testLabel + 1] = -1
+            except:
+                c[testLabel - 1] = -1
+        else:
+            c[0] = 1.
+            c[1] = -1
 
     startTime = time.time()
     BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,

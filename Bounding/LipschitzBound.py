@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from copy import deepcopy
 import cvxpy as cp
+from scipy.linalg import block_diag
 
 
 """
@@ -27,6 +28,8 @@ class LipschitzBounding:
         self.performVirtualBranching = virtualBranching
         self.extractWeightsForMilp()
         self.normToUse = 2
+        self.useTwoNormDilation = False
+        self.useSdpForLipschitzCalculation = False
 
     def lowerBound(self,
                    queryCoefficient: torch.Tensor,
@@ -64,18 +67,28 @@ class LipschitzBounding:
 
         # this function is not optimal for cases in which an axis is cut into unequal segments
         dilationVector = difference / torch.tensor(2., device=self.device)
-        if self.normToUse == 2 or self.normToUse == 1:
+        if (self.normToUse == 2 and not self.useTwoNormDilation) or self.normToUse == 1:
             if len(self.calculatedLipschitzConstants) == 0:
-                newWeights = [w.cpu().numpy() for w in self.weights]
+                timer.start("lowerBound:lipschitzCalc")
+                newWeights = [w.cpu().numpy() / 10 for w in self.weights]
                 newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
-                lipschitzConstant = torch.from_numpy(
-                    self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(self.device)
+                if self.useSdpForLipschitzCalculation and self.normToUse == 2:
+                    num_neurons = sum([newWeights[i].shape[0] for i in range(len(newWeights) - 1)])
+                    alpha = np.zeros((num_neurons, 1))
+                    beta = np.ones((num_neurons, 1))
+                    lipschitzConstant = torch.Tensor([lipSDP(newWeights, alpha, beta)]).to(self.device)
+                else:
+                    lipschitzConstant = torch.from_numpy(
+                        self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(self.device)
+                lipschitzConstant *= 10 ** len(newWeights)
+                print(lipschitzConstant)
                 self.calculatedLipschitzConstants.append(lipschitzConstant)
+                timer.pause("lowerBound:lipschitzCalc")
             else:
                 lipschitzConstant = self.calculatedLipschitzConstants[0]
             multipliers = torch.linalg.norm(dilationVector, ord=self.normToUse, dim=1)
             additiveTerm = lipschitzConstant * multipliers
-        elif self.normToUse == float("inf"):
+        elif self.normToUse == float("inf") or (self.normToUse == 2 and self.useTwoNormDilation):
             timer.start("lowerBound:lipschitzSearch")
             batchesThatNeedLipschitzConstantCalculation = [i for i in range(batchSize)]
             lipschitzConstants = -torch.ones(batchSize, device=self.device)
@@ -104,6 +117,10 @@ class LipschitzBounding:
             timer.pause("lowerBound:lipschitzSearch")
             timer.start("lowerBound:lipschitzCalc")
             if len(batchesThatNeedLipschitzConstantCalculation) != 0:
+                if self.normToUse == 2:
+                    normalizerDilationVector = torch.sqrt(difference.shape[1] * dilationVector)
+                else:
+                    normalizerDilationVector = dilationVector
                 # Incorporate the query coefficient and the dilation matrix into the weights so that the whole problem is a
                 # neural network
                 """"""
@@ -111,24 +128,25 @@ class LipschitzBounding:
                 newWeights = [w.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1) for w in self.weights]
                 # w @ D is equivalent to w * dilationVector
                 # newWeights[0] = newWeights[0] @ dMatrix
-                newWeights[0] = newWeights[0] * dilationVector[batchesThatNeedLipschitzConstantCalculation, :].unsqueeze(1)
+
+                newWeights[0] = newWeights[0] * normalizerDilationVector[batchesThatNeedLipschitzConstantCalculation, :].unsqueeze(1)
                 # print(newWeights[0])
                 queryCoefficientRepeated = queryCoefficient.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1)
                 # newWeights[-1] = queryCoefficient @ newWeights[-1]
 
                 newWeights[-1] = torch.bmm(queryCoefficientRepeated, newWeights[-1])
                 # print(newWeights)
-                newCalculatedLipschitzConstants = self.calculateLipschitzConstant(newWeights, self.device)[:, -1]
+                newCalculatedLipschitzConstants = self.calculateLipschitzConstant(newWeights, self.device, self.normToUse)[:, -1]
                 """"""
                 # # Numpy single batch implementation
                 # newCalculatedLipschitzConstants = []
                 # for i in range(len(batchesThatNeedLipschitzConstantCalculation)):
                 #     newWeights = [w.cpu().numpy() for w in self.weights]
-                #     newWeights[0] = newWeights[0] * dilationVector[batchesThatNeedLipschitzConstantCalculation[i]:
+                #     newWeights[0] = newWeights[0] * normalizerDilationVector[batchesThatNeedLipschitzConstantCalculation[i]:
                 #                                                    batchesThatNeedLipschitzConstantCalculation[i] + 1, :].cpu().numpy()
                 #     newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
                 #     # print(newWeights)
-                #     newCalculatedLipschitzConstants.append(torch.from_numpy(self.calculateLipschitzConstantSingleBatchNumpy(newWeights))[-1].to(self.device))
+                #     newCalculatedLipschitzConstants.append(torch.from_numpy(self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(self.device))
 
                 """"""
 
@@ -335,3 +353,39 @@ class LipschitzBounding:
             t.append(tTemp)
         return s, t
 
+
+def lipSDP(weights, alpha, beta):
+    num_layers = len(weights) - 1
+    dim_in = weights[0].shape[1]
+    dim_out = weights[-1].shape[0]
+    dim_last_hidden = weights[-1].shape[1]
+    hidden_dims = [weights[i].shape[0] for i in range(0, num_layers)]
+    dims = [dim_in] + hidden_dims + [dim_out]
+    num_neurons = sum(hidden_dims)
+
+    # decision vars
+    Lambda = cp.Variable((num_neurons, 1), nonneg=True)
+    T = cp.diag(Lambda)
+    rho = cp.Variable((1, 1), nonneg=True)
+
+    A = weights[0]
+    C = np.bmat([np.zeros((weights[-1].shape[0], dim_in + num_neurons - dim_last_hidden)), weights[-1]])
+    D = np.bmat([np.eye(dim_in), np.zeros((dim_in, num_neurons))])
+
+    for i in range(1, num_layers):
+        A = block_diag(A, weights[i])
+
+    A = np.bmat([A, np.zeros((A.shape[0], weights[num_layers].shape[1]))])
+    B = np.eye(num_neurons)
+    B = np.bmat([np.zeros((num_neurons, weights[0].shape[1])), B])
+    A_on_B = np.bmat([[A], [B]])
+
+    cons = [A_on_B.T @ cp.bmat(
+        [[-2 * np.diag(alpha[:, 0]) @ np.diag(beta[:, 0]) @ T, np.diag(alpha[:, 0] + beta[:, 0]) @ T],
+         [np.diag(alpha[:, 0] + beta[:, 0]) @ T, -2 * T]]) @ A_on_B + C.T @ C - rho * D.T @ D << 0]
+
+    prob = cp.Problem(cp.Minimize(rho), cons)
+
+    prob.solve(solver=cp.MOSEK, verbose=True)
+
+    return np.sqrt(rho.value)[0][0]

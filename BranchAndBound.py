@@ -200,7 +200,9 @@ class BranchAndBound:
             plotter.showAnimation()
         self.timers.pauseAll()
         self.timers.print()
+        print(self.lowerBoundClass.calculatedLipschitzConstants)
         print("number of calculated lipschitz constants ", len(self.lowerBoundClass.calculatedLipschitzConstants))
+
         return self.bestLowerBound, self.bestUpperBound, self.spaceNodes
 
     def __repr__(self):
