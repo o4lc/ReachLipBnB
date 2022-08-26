@@ -19,18 +19,27 @@ class LipschitzBounding:
     def __init__(self,
                  network: nn.Module,
                  device=torch.device("cuda", 0),
-                 virtualBranching=False):
+                 virtualBranching=False,
+                 maxSearchDepth=10,
+                 normToUse=2,
+                 useTwoNormDilation=False,
+                 useSdpForLipschitzCalculation=False,
+                 numberOfVirtualBranches=4,
+                 sdpSolverVerbose=False):
         self.network = network
         self.device = device
         self.weights = self.extractWeightsFromNetwork(self.network)
         self.calculatedLipschitzConstants = []
-        self.maxSearchDepth = 10
+        self.maxSearchDepth = maxSearchDepth
         self.performVirtualBranching = virtualBranching
         self.extractWeightsForMilp()
-        self.normToUse = 2
-        self.useTwoNormDilation = False
-        self.useSdpForLipschitzCalculation = False
-
+        self.normToUse = normToUse
+        self.useTwoNormDilation = useTwoNormDilation
+        self.useSdpForLipschitzCalculation = useSdpForLipschitzCalculation
+        self.numberOfVirtualBranches = numberOfVirtualBranches
+        if normToUse == 2:
+            assert (not(self.useSdpForLipschitzCalculation and self.useTwoNormDilation))
+        self.sdpSolverVerbose = sdpSolverVerbose
     def lowerBound(self,
                    queryCoefficient: torch.Tensor,
                    inputLowerBound: torch.Tensor,
@@ -41,19 +50,18 @@ class LipschitzBounding:
         difference = inputUpperBound - inputLowerBound
         if virtualBranch and self.performVirtualBranching:
             timer.start("lowerBound:virtualBranchPreparation")
-            numberOfVirtualBranches = 4
             maxIndices = torch.argmax(difference, 1)
             newLowers = [inputLowerBound[i, :].clone() for i in range(batchSize)
-                         for _ in range(numberOfVirtualBranches)]
+                         for _ in range(self.numberOfVirtualBranches)]
             newUppers = [inputUpperBound[i, :].clone() for i in range(batchSize)
-                         for _ in range(numberOfVirtualBranches)]
+                         for _ in range(self.numberOfVirtualBranches)]
             for i in range(batchSize):
-                for j in range(numberOfVirtualBranches):
-                    newUppers[numberOfVirtualBranches * i + j][maxIndices[i]] = \
-                        newLowers[numberOfVirtualBranches * i + j][maxIndices[i]] +\
-                        (j + 1) * difference[i, maxIndices[i]] / numberOfVirtualBranches
-                    newLowers[numberOfVirtualBranches * i + j][maxIndices[i]] +=\
-                        j * difference[i, maxIndices[i]] / numberOfVirtualBranches
+                for j in range(self.numberOfVirtualBranches):
+                    newUppers[self.numberOfVirtualBranches * i + j][maxIndices[i]] = \
+                        newLowers[self.numberOfVirtualBranches * i + j][maxIndices[i]] +\
+                        (j + 1) * difference[i, maxIndices[i]] / self.numberOfVirtualBranches
+                    newLowers[self.numberOfVirtualBranches * i + j][maxIndices[i]] +=\
+                        j * difference[i, maxIndices[i]] / self.numberOfVirtualBranches
 
             newLowers = torch.vstack(newLowers)
             newUppers = torch.vstack(newUppers)
@@ -61,7 +69,7 @@ class LipschitzBounding:
             virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False, timer=timer)
             timer.start("lowerBound:virtualBranchMin")
             virtualBranchLowerBounds = torch.Tensor([torch.min(
-                virtualBranchLowerBoundsExtra[i * numberOfVirtualBranches:(i + 1) * numberOfVirtualBranches])
+                virtualBranchLowerBoundsExtra[i * self.numberOfVirtualBranches:(i + 1) * self.numberOfVirtualBranches])
                 for i in range(0, batchSize)]).to(self.device)
             timer.pause("lowerBound:virtualBranchMin")
 
@@ -70,17 +78,25 @@ class LipschitzBounding:
         if (self.normToUse == 2 and not self.useTwoNormDilation) or self.normToUse == 1:
             if len(self.calculatedLipschitzConstants) == 0:
                 timer.start("lowerBound:lipschitzCalc")
-                newWeights = [w.cpu().numpy() / 10 for w in self.weights]
+                newWeights = [w.cpu().numpy() for w in self.weights]
                 newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
+                lipschitzConstant = torch.from_numpy(
+                    self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
+                    self.device)
+                # normalizer = (lipschitzConstant / 1) ** (1 / len(newWeights))
+                normalizer = 1
+                newWeights = [w / normalizer for w in newWeights]
                 if self.useSdpForLipschitzCalculation and self.normToUse == 2:
                     num_neurons = sum([newWeights[i].shape[0] for i in range(len(newWeights) - 1)])
                     alpha = np.zeros((num_neurons, 1))
                     beta = np.ones((num_neurons, 1))
-                    lipschitzConstant = torch.Tensor([lipSDP(newWeights, alpha, beta)]).to(self.device)
+                    lipschitzConstant = torch.Tensor([lipSDP(newWeights, alpha, beta, verbose=self.sdpSolverVerbose)]).to(self.device)
                 else:
                     lipschitzConstant = torch.from_numpy(
-                        self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(self.device)
-                lipschitzConstant *= 10 ** len(newWeights)
+                        self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
+                        self.device)
+                print(len(newWeights))
+                lipschitzConstant *= normalizer ** len(newWeights)
                 print(lipschitzConstant)
                 self.calculatedLipschitzConstants.append(lipschitzConstant)
                 timer.pause("lowerBound:lipschitzCalc")
@@ -297,7 +313,7 @@ class LipschitzBounding:
             objective = cp.Minimize(c @ outputVariableMatrix)
             prob = cp.Problem(objective, constraints)
             try:
-                prob.solve(solver=cp.MOSEK, warm_start=True, verbose=False,
+                prob.solve(solver=cp.MOSEK, warm_start=True, verbose=self.sdpSolverVerbose,
                            mosek_params={
                                "MSK_DPAR_MIO_REL_GAP_CONST": 1e-15,
                                "MSK_DPAR_MIO_TOL_ABS_RELAX_INT": 1e-9,
@@ -354,7 +370,7 @@ class LipschitzBounding:
         return s, t
 
 
-def lipSDP(weights, alpha, beta):
+def lipSDP(weights, alpha, beta, verbose=False):
     num_layers = len(weights) - 1
     dim_in = weights[0].shape[1]
     dim_out = weights[-1].shape[0]
@@ -386,6 +402,6 @@ def lipSDP(weights, alpha, beta):
 
     prob = cp.Problem(cp.Minimize(rho), cons)
 
-    prob.solve(solver=cp.MOSEK, verbose=True)
+    prob.solve(solver=cp.MOSEK, verbose=verbose)
 
     return np.sqrt(rho.value)[0][0]
