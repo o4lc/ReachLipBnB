@@ -19,7 +19,7 @@ class BranchAndBound:
                  virtualBranching=False, numberOfVirtualBranches=4,
                  maxSearchDepthLipschitzBound=10,
                  normToUseLipschitz=2, useTwoNormDilation=False, useSdpForLipschitzCalculation=False,
-                 lipschitzSdpSolverVerbose=False
+                 lipschitzSdpSolverVerbose=False, initialGD=False
                  ):
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = None
@@ -43,6 +43,7 @@ class BranchAndBound:
         self.branchNodeNum = branchNodeNum
         self.device = device
         self.maximumBatchSize = maximumBatchSize
+        self.initialGD = initialGD
         self.timers = Timers(["lowerBound",
                               "lowerBound:lipschitzForwardPass", "lowerBound:lipschitzCalc",
                               "lowerBound:lipschitzSearch",
@@ -162,7 +163,15 @@ class BranchAndBound:
             self.spaceNodes[index].lower = lowerBounds[i]
 
     def run(self):
-        self.bestUpperBound = torch.Tensor([torch.inf]).to(self.device)
+        if self.initialGD:
+            initUpperBoundClass = PgdUpperBound(self.network, 10, 1000, 0.001,
+                                             self.inputDimension, self.device, self.maximumBatchSize)
+
+
+            self.bestUpperBound = torch.Tensor(initUpperBoundClass.upperBound([0], self.spaceNodes, self.queryCoefficient))
+            print(self.bestUpperBound)
+        else:
+            self.bestUpperBound = torch.Tensor([torch.inf]).to(self.device)
         self.bestLowerBound = torch.Tensor([-torch.inf]).to(self.device)
 
         if self.verbose:
@@ -171,10 +180,10 @@ class BranchAndBound:
         self.bound([0], self.bestUpperBound, self.bestLowerBound)
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
             print(len(self.spaceNodes))
-            for i in range(len(self.spaceNodes)):
-                if self.spaceNodes[i].lower > self.spaceNodes[i].upper:
-                    print("@@: ", i, self.spaceNodes[i].lower, self.spaceNodes[i].upper)
-                    raise
+            # for i in range(len(self.spaceNodes)):
+            #     if self.spaceNodes[i].lower > self.spaceNodes[i].upper:
+            #         print("@@: ", i, self.spaceNodes[i].lower, self.spaceNodes[i].upper)
+            #         raise
             self.timers.start("branch")
             indices, deletedUb, deletedLb = self.branch()
             # print(indices, end=" ")

@@ -86,7 +86,8 @@ def main():
                         maxSearchDepthLipschitzBound=maxSearchDepthLipschitzBound,
                         normToUseLipschitz=normToUseLipschitz, useTwoNormDilation=useTwoNormDilation,
                         useSdpForLipschitzCalculation=useSdpForLipschitzCalculation,
-                        lipschitzSdpSolverVerbose=lipschitzSdpSolverVerbose
+                        lipschitzSdpSolverVerbose=lipschitzSdpSolverVerbose,
+                        initialGD = False
                         )
     lowerBound, upperBound, space_left = BB.run()
     endTime = time.time()

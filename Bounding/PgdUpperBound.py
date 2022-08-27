@@ -65,17 +65,17 @@ class PgdUpperBound:
 
         x = Variable(x0, requires_grad=True)
 
-        # Batch Gradient Descent
-        for i in range(self.pgdIterNum):
-            x.requires_grad = True
-            with torch.autograd.profiler.profile() as prof:
-                def loss_reducer(x):
-                    return self.network.forward(x) @ queryCoefficient
+        # # Batch Gradient Descent
+        # for i in range(self.pgdIterNum):
+        #     x.requires_grad = True
+        #     with torch.autograd.profiler.profile() as prof:
+        #         def loss_reducer(x):
+        #             return self.network.forward(x) @ queryCoefficient
 
-                gradient = jacobian(loss_reducer, x)
+        #         gradient = jacobian(loss_reducer, x)
 
-            with no_grad():
-                x = x - self.pgdStepSize * gradient.sum(-self.pgdNumberOfInitializations)
+        #     with no_grad():
+        #         x = x - self.pgdStepSize * gradient.sum(-self.inputDimension)
 
 
         # Per Sample Gradient Descent
@@ -90,18 +90,18 @@ class PgdUpperBound:
         #     with no_grad():
         #         x = x - self.eta * gradient.sum(-self.pgdNumberOfInitializations)
 
-        # # Gradient Descent
-        # for i in range(self.pgdIterNum):
-        #     x.requires_grad = True
-        #     for j in range(self.pgdNumberOfInitializations):
-        #         with torch.autograd.profiler.profile() as prof:
-        #             ll = queryCoefficient @ self.network.forward(x[j])
-        #             ll.backward()
-        #             # l.append(ll.data)
-        #
-        #     with no_grad():
-        #         gradient = x.grad.data
-        #         x = x - self.pgdStepSize * gradient
+        # Gradient Descent
+        for i in range(self.pgdIterNum):
+            x.requires_grad = True
+            for j in range(self.pgdNumberOfInitializations):
+                with torch.autograd.profiler.profile() as prof:
+                    ll = queryCoefficient @ self.network.forward(x[j])
+                    ll.backward()
+                    # l.append(ll.data)
+        
+            with no_grad():
+                gradient = x.grad.data
+                x = x - self.pgdStepSize * gradient
 
         # Projection
         x = torch.clamp(x, nodes[index].coordLower, nodes[index].coordUpper)
