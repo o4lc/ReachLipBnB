@@ -22,7 +22,7 @@ def main():
 
     data_mean = pca.mean_
     data_comp = pca.components_
- 
+    print(data_comp)
 
     data -= data_mean
     data_test = data_comp @ data.T
@@ -36,6 +36,8 @@ def main():
     plt.axis('square')
     
     plt.show()
+
+
 
 if __name__ == '__main__':
     main()

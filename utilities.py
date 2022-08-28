@@ -23,7 +23,7 @@ class Plotter():
                                     edgecolor=None, facecolor="grey", linewidth=7, alpha=0.5)
         ax.add_patch(rectangle)
 
-        print(space)
+        # print(space)
         for node in space:
             rectangle = patches.Rectangle((node.coordLower[0], node.coordLower[1]), 
                                         node.coordUpper[0] - node.coordLower[0], 

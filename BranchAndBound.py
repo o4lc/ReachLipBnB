@@ -19,8 +19,16 @@ class BranchAndBound:
                  virtualBranching=False, numberOfVirtualBranches=4,
                  maxSearchDepthLipschitzBound=10,
                  normToUseLipschitz=2, useTwoNormDilation=False, useSdpForLipschitzCalculation=False,
-                 lipschitzSdpSolverVerbose=False, initialGD=False
+                 lipschitzSdpSolverVerbose=False, initialGD=False,
+                 rotationMatrix=None, rotationConstant=None
                  ):
+        
+        if rotationMatrix is not None:
+            rotation = nn.Linear(inputDimension, inputDimension)
+            rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(rotationMatrix))
+            rotation.bias = torch.nn.parameter.Parameter(rotationConstant)
+            network.rotation = rotation
+
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = None
         self.bestLowerBound = None
@@ -44,6 +52,8 @@ class BranchAndBound:
         self.device = device
         self.maximumBatchSize = maximumBatchSize
         self.initialGD = initialGD
+        self.rotationMatrix = rotationMatrix
+        self.rotationConstant = rotationConstant
         self.timers = Timers(["lowerBound",
                               "lowerBound:lipschitzForwardPass", "lowerBound:lipschitzCalc",
                               "lowerBound:lipschitzSearch",
@@ -207,9 +217,9 @@ class BranchAndBound:
             #1.08618
             print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound, "diff", self.bestUpperBound - self.bestLowerBound)
             if self.verbose:
-                print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound)
+                # print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound)
                 plotter.plotSpace(self.spaceNodes, self.initCoordLow, self.initCoordUp)
-                print('--------------------')
+                # print('--------------------')
 
         if self.verbose:
             plotter.showAnimation()

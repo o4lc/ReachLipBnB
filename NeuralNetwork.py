@@ -14,6 +14,7 @@ class NeuralNetwork(nn.Module):
         self.Linear = nn.Sequential(
             *layers
         )
+        self.rotation = nn.Identity()
         self.load_state_dict(stateDictionary)
 
     def load(self, path):
@@ -24,4 +25,4 @@ class NeuralNetwork(nn.Module):
     # def train(self):
 
     def forward(self, x):
-        return self.Linear(x)
+        return self.Linear(self.rotation(x))
