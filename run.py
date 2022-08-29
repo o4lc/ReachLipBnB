@@ -11,7 +11,7 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .001
+    eps = .0001
     verbose = 0
     virtualBranching = False
     numberOfVirtualBranches = 4,
@@ -20,7 +20,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 1
+    finalHorizon = 3
 
     if torch.cuda.is_available():
         device = torch.device("cuda", 0)
@@ -33,9 +33,9 @@ def main():
     print(' ')
 
     # pathToStateDictionary = "Networks/randomNetwork.pth"
-    pathToStateDictionary = "Networks/randomNetwork2.pth"
+    # pathToStateDictionary = "Networks/randomNetwork2.pth"
     # pathToStateDictionary = "Networks/randomNetwork3.pth"
-    # pathToStateDictionary = "Networks/trainedNetwork1.pth"
+    pathToStateDictionary = "Networks/trainedNetwork1.pth"
     # pathToStateDictionary = "Networks/RobotArmStateDict2-5-2.pth"
     # pathToStateDictionary = "Networks/Test3-5-3.pth"
     # pathToStateDictionary = "Networks/ACASXU.pth"
@@ -75,20 +75,15 @@ def main():
         # print(data_comp[0] @ data_comp[1])
 
         plt.figure()
-        plt.scatter(imageData[:, 0], imageData[:, 1])
-        plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 1000, data_comp[0, 1] / 1000, width=0.00003)
-        plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 1000, data_comp[1, 1] / 1000, width=0.00003)
+        plt.scatter(imageData[:, 0], imageData[:, 1], marker='.')
+        plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 100000, data_comp[0, 1] / 100000, width=0.000003)
+        plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 100000, data_comp[1, 1] / 100000, width=0.000003)
         
         pcaDirections = []
         for direction in data_comp:
-            # Rows are the components!
-            winningIndex = np.argmax(abs(direction))
-            if direction[winningIndex] > 0:
-                pcaDirections.append(-direction)
-                pcaDirections.append(direction)
-            else:
-                pcaDirections.append(direction)
-                pcaDirections.append(-direction)
+            pcaDirections.append(-direction)
+            pcaDirections.append(direction)
+
         pcaDirections = torch.Tensor(np.array(pcaDirections))
         calculatedLowerBoundsforpcaDirections = torch.Tensor(np.zeros(len(pcaDirections)))
         
@@ -115,6 +110,10 @@ def main():
         
         previousRotationMatrix = data_comp
         previousRotationBias = data_mean
+        rotation = nn.Linear(dim, dim)
+        rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
+        rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
+        network.rotation = rotation
 
         # print(pcaDirections)
         # print(calculatedLowerBoundsforpcaDirections )
@@ -123,7 +122,7 @@ def main():
             upperCoordinate[i] = -calculatedLowerBoundsforpcaDirections[2 * i]
             lowerCoordinate[i] = calculatedLowerBoundsforpcaDirections[2 * i + 1]
 
-        x0 = np.array([torch.min(imageData[:, 0]).numpy(), torch.max(imageData[:, 0]).numpy()])
+        x0 = np.array([torch.min(imageData[:, 0]).numpy() - eps, torch.max(imageData[:, 0]).numpy() + eps])
         for i in range(len(upperCoordinate)):
             # c = -upperCoordinateMultiplier[i] * pcaDirections[i]
             c = pcaDirections[2 * i + 1]
@@ -146,8 +145,13 @@ def main():
 
         # plt.plot(x1, y1)
 
+        print(upperCoordinate)
+        print(lowerCoordinate)
+        plt.axis("equal")
 
+        plt.savefig("reachabilityPics/outputIteration" + str(iteration) + ".png")
         plt.show()
+
 
             
 

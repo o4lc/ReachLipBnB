@@ -23,11 +23,11 @@ class BranchAndBound:
                  rotationMatrix=None, rotationConstant=None
                  ):
         
-        if rotationMatrix is not None:
-            rotation = nn.Linear(inputDimension, inputDimension)
-            rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(rotationMatrix))
-            rotation.bias = torch.nn.parameter.Parameter(rotationConstant)
-            network.rotation = rotation
+        # if rotationMatrix is not None:
+        #     rotation = nn.Linear(inputDimension, inputDimension)
+        #     rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(rotationMatrix))
+        #     rotation.bias = torch.nn.parameter.Parameter(rotationConstant)
+        #     network.rotation = rotation
 
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = None
