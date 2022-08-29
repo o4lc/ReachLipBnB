@@ -11,7 +11,7 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .03
+    eps = .001
     verbose = 0
     virtualBranching = False
     numberOfVirtualBranches = 4,
@@ -78,8 +78,7 @@ def main():
         plt.scatter(imageData[:, 0], imageData[:, 1])
         plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 1000, data_comp[0, 1] / 1000, width=0.00003)
         plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 1000, data_comp[1, 1] / 1000, width=0.00003)
-        plt.show()
-
+        
         pcaDirections = []
         for direction in data_comp:
             # Rows are the components!
@@ -116,15 +115,45 @@ def main():
         # print(calculatedLowerBoundsforpcaDirections )
         calculatedLowerBoundsforpcaDirections = -calculatedLowerBoundsforpcaDirections
         directionMultipliers = np.zeros(pcaDirections.shape[0])
+        upperCoordinateMultiplier = np.ones_like(upperCoordinate)
         for i, component in enumerate(data_comp):
             winningIndex = np.argmax(abs(component))
             if component[winningIndex] >0 :
+                upperCoordinateMultiplier[i] = 1
                 upperCoordinate[i] = calculatedLowerBoundsforpcaDirections[2 * i]
                 lowerCoordinate[i] = calculatedLowerBoundsforpcaDirections[2 * i + 1]
             else:
+                upperCoordinateMultiplier[i] = -1
                 upperCoordinate[i] = calculatedLowerBoundsforpcaDirections[2 * i + 1]
                 lowerCoordinate[i] = calculatedLowerBoundsforpcaDirections[2 * i]
         calculatedLowerBoundsforpcaDirections = calculatedLowerBoundsforpcaDirections * directionMultipliers
+
+        for i in range(len(upperCoordinate)):
+            x0 = np.array([torch.min(imageData[:, 0]).numpy(), torch.max(imageData[:, 0]).numpy()])
+            c = -upperCoordinateMultiplier[i] * data_comp[i]
+            y0 = ( upperCoordinate[i] - c[0] * x0)/c[1]
+
+            plt.plot(x0, y0)
+
+            y0 = (lowerCoordinate[i] - c[0] * x0)/c[1]
+
+            plt.plot(x0, y0)
+
+        # plt.gca().set_aspect('equal', adjustable='box')
+
+        # x1 = np.array([torch.min(imageData[:, 0]).numpy(), torch.max(imageData[:, 0]).numpy()])
+        # c = data_comp[1]
+        # y1 = (-upperCoordinate[1] - c[0] * x1)/c[1]
+
+        # plt.plot(x1, y1)
+
+        # c = data_comp[1]
+        # y1 = (lowerCoordinate[1] - c[0] * x1)/c[1]
+
+        # plt.plot(x1, y1)
+
+
+        plt.show()
 
             
 
