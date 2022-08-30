@@ -25,11 +25,12 @@ class LipschitzBounding:
                  useTwoNormDilation=False,
                  useSdpForLipschitzCalculation=False,
                  numberOfVirtualBranches=4,
-                 sdpSolverVerbose=False):
+                 sdpSolverVerbose=False,
+                 calculatedLipschitzConstants=[]):
         self.network = network
         self.device = device
         self.weights = self.extractWeightsFromNetwork(self.network)
-        self.calculatedLipschitzConstants = []
+        self.calculatedLipschitzConstants = calculatedLipschitzConstants
         self.maxSearchDepth = maxSearchDepth
         self.performVirtualBranching = virtualBranching
         self.extractWeightsForMilp()
@@ -40,6 +41,7 @@ class LipschitzBounding:
         if normToUse == 2:
             assert (not(self.useSdpForLipschitzCalculation and self.useTwoNormDilation))
         self.sdpSolverVerbose = sdpSolverVerbose
+
     def lowerBound(self,
                    queryCoefficient: torch.Tensor,
                    inputLowerBound: torch.Tensor,
@@ -49,7 +51,7 @@ class LipschitzBounding:
         batchSize = inputUpperBound.shape[0]
         difference = inputUpperBound - inputLowerBound
         if virtualBranch and self.performVirtualBranching:
-            timer.start("lowerBound:virtualBranchPreparation")
+            self.startTime(timer, "lowerBound:virtualBranchPreparation")
             maxIndices = torch.argmax(difference, 1)
             newLowers = [inputLowerBound[i, :].clone() for i in range(batchSize)
                          for _ in range(self.numberOfVirtualBranches)]
@@ -65,19 +67,22 @@ class LipschitzBounding:
 
             newLowers = torch.vstack(newLowers)
             newUppers = torch.vstack(newUppers)
-            timer.pause("lowerBound:virtualBranchPreparation")
+            self.pauseTime(timer, "lowerBound:virtualBranchPreparation")
+
             virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False, timer=timer)
-            timer.start("lowerBound:virtualBranchMin")
+            self.startTime(timer, "lowerBound:virtualBranchMin")
+
             virtualBranchLowerBounds = torch.Tensor([torch.min(
                 virtualBranchLowerBoundsExtra[i * self.numberOfVirtualBranches:(i + 1) * self.numberOfVirtualBranches])
                 for i in range(0, batchSize)]).to(self.device)
-            timer.pause("lowerBound:virtualBranchMin")
+            self.pauseTime(timer, "lowerBound:virtualBranchMin")
 
         # this function is not optimal for cases in which an axis is cut into unequal segments
         dilationVector = difference / torch.tensor(2., device=self.device)
         if (self.normToUse == 2 and not self.useTwoNormDilation) or self.normToUse == 1:
             if len(self.calculatedLipschitzConstants) == 0:
-                timer.start("lowerBound:lipschitzCalc")
+                self.startTime(timer, "lowerBound:lipschitzCalc")
+
                 newWeights = [w.cpu().numpy() for w in self.weights]
                 newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
                 # lipschitzConstant = torch.from_numpy(
@@ -98,13 +103,13 @@ class LipschitzBounding:
                 lipschitzConstant *= normalizer ** len(newWeights)
                 print(lipschitzConstant)
                 self.calculatedLipschitzConstants.append(lipschitzConstant)
-                timer.pause("lowerBound:lipschitzCalc")
+                self.pauseTime(timer, "lowerBound:lipschitzCalc")
             else:
                 lipschitzConstant = self.calculatedLipschitzConstants[0]
             multipliers = torch.linalg.norm(dilationVector, ord=self.normToUse, dim=1)
             additiveTerm = lipschitzConstant * multipliers
         elif self.normToUse == float("inf") or (self.normToUse == 2 and self.useTwoNormDilation):
-            timer.start("lowerBound:lipschitzSearch")
+            self.startTime(timer, "lowerBound:lipschitzSearch")
             batchesThatNeedLipschitzConstantCalculation = [i for i in range(batchSize)]
             lipschitzConstants = -torch.ones(batchSize, device=self.device)
             locationOfUnavailableConstants = {}
@@ -129,8 +134,8 @@ class LipschitzBounding:
                     # be the same. By adding the dilationVector of one of the sides, we are preventing the calculation of
                     # the lipschitz constant for both sides when they are exactly the same.
                     self.calculatedLipschitzConstants.append([dilationVector[batchCounter, :], -1])
-            timer.pause("lowerBound:lipschitzSearch")
-            timer.start("lowerBound:lipschitzCalc")
+            self.pauseTime(timer, "lowerBound:lipschitzSearch")
+            self.startTime(timer, "lowerBound:lipschitzCalc")
             if len(batchesThatNeedLipschitzConstantCalculation) != 0:
                 if self.normToUse == 2:
                     normalizerDilationVector = torch.sqrt(difference.shape[1]) * dilationVector
@@ -174,7 +179,7 @@ class LipschitzBounding:
 
                 # if len(batchesThatNeedLipschitzConstantCalculation) != 1:
                 #     print(dilationVector[batchesThatNeedLipschitzConstantCalculation, :])
-            timer.pause("lowerBound:lipschitzCalc")
+            self.pauseTime(timer, "lowerBound:lipschitzCalc")
             if torch.any(lipschitzConstants < 0):
                 print("error. lipschitz constant hasn't been calculated")
                 raise
@@ -182,9 +187,10 @@ class LipschitzBounding:
 
         centerPoint = (inputUpperBound + inputLowerBound) / torch.tensor(2., device=self.device)
         with torch.no_grad():
-            timer.start("lowerBound:lipschitzForwardPass")
+            self.startTime(timer, "lowerBound:lipschitzForwardPass")
+
             lowerBound = self.network(centerPoint) @ queryCoefficient - additiveTerm
-            timer.pause("lowerBound:lipschitzForwardPass")
+            self.pauseTime(timer, "lowerBound:lipschitzForwardPass")
 
             # for batchCounter in range(batchSize):
             #     import time
@@ -228,6 +234,20 @@ class LipschitzBounding:
                     temp += multiplier * torch.linalg.norm(productMatrix, normToUse, dim=(1, 2))
             ms[:, i] = temp
         return ms
+
+    @staticmethod
+    def startTime(timer, timerName):
+        try:
+            timer.start(timerName)
+        except:
+            pass
+
+    @staticmethod
+    def pauseTime(timer, timerName):
+        try:
+            timer.pause(timerName)
+        except:
+            pass
 
     @staticmethod
     def calculateLipschitzConstantSingleBatchNumpy(weights, normToUse=float("inf")):

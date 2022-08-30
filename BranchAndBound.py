@@ -19,10 +19,8 @@ class BranchAndBound:
                  virtualBranching=False, numberOfVirtualBranches=4,
                  maxSearchDepthLipschitzBound=10,
                  normToUseLipschitz=2, useTwoNormDilation=False, useSdpForLipschitzCalculation=False,
-                 lipschitzSdpSolverVerbose=False, initialGD=False,
+                 lipschitzSdpSolverVerbose=False, initialGD=False, previousLipschitzCalculations=[]
                  ):
-        
-
 
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = None
@@ -38,7 +36,8 @@ class BranchAndBound:
         self.queryCoefficient = queryCoefficient
         self.lowerBoundClass = LipschitzBounding(network, device, virtualBranching, maxSearchDepthLipschitzBound,
                                                  normToUseLipschitz, useTwoNormDilation, useSdpForLipschitzCalculation,
-                                                 numberOfVirtualBranches, lipschitzSdpSolverVerbose)
+                                                 numberOfVirtualBranches, lipschitzSdpSolverVerbose,
+                                                 previousLipschitzCalculations)
         self.upperBoundClass = PgdUpperBound(network, pgdNumberOfInitializations, pgdIterNum, pgdStepSize,
                                              inputDimension, device, maximumBatchSize)
         self.nodeBranchingFactor = nodeBranchingFactor

@@ -20,8 +20,9 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 3
+    finalHorizon = 2
     initialGD = False
+    performMultiStepSingleHorizon = False
 
     if torch.cuda.is_available():
         device = torch.device("cuda", 0)
@@ -44,7 +45,9 @@ def main():
 
     pathToStateDictionary = "Networks/" + fileName
     network = NeuralNetwork(pathToStateDictionary)
-
+    if performMultiStepSingleHorizon:
+        repeatNetwork(network, finalHorizon)
+        finalHorizon = 1
 
     dim = network.Linear[0].weight.shape[1]
     outputDim = network.Linear[-1].weight.shape[0]
@@ -80,8 +83,8 @@ def main():
 
     startTime = time.time()
 
-
     for iteration in range(finalHorizon):
+
         inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
                 + lowerCoordinate
 
@@ -112,8 +115,12 @@ def main():
         calculatedLowerBoundsforpcaDirections = torch.Tensor(np.zeros(len(pcaDirections)))
         
         for i in range(len(pcaDirections)):
+            previousLipschitzCalculations = []
+            if i % 2 == 1 and torch.allclose(pcaDirections[i], -pcaDirections[i - 1]):
+                previousLipschitzCalculations = BB.lowerBoundClass.calculatedLipschitzConstants
             c = pcaDirections[i]
             print('** Solving with coefficient =', c)
+
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
                                 queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
                                 scoreFunction='length',
@@ -123,7 +130,8 @@ def main():
                                 normToUseLipschitz=normToUseLipschitz, useTwoNormDilation=useTwoNormDilation,
                                 useSdpForLipschitzCalculation=useSdpForLipschitzCalculation,
                                 lipschitzSdpSolverVerbose=lipschitzSdpSolverVerbose,
-                                initialGD=initialGD
+                                initialGD=initialGD,
+                                previousLipschitzCalculations=previousLipschitzCalculations
                                 )
             lowerBound, upperBound, space_left = BB.run()
             calculatedLowerBoundsforpcaDirections[i] = lowerBound
@@ -153,7 +161,7 @@ def main():
         plt.axis("equal")
 
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
-        plt.show()
+        # plt.show()
 
 
             
@@ -162,6 +170,19 @@ def main():
     endTime = time.time()
     
     print('The algorithm took (s):', endTime - startTime, 'with eps =', eps)
+
+
+def repeatNetwork(network, horizon):
+    originalNetworkLength = len(network.Linear)
+    for j in range(horizon - 1):
+        for i in range(originalNetworkLength):
+            if type(network.Linear[i]) == nn.modules.activation.ReLU:
+                network.Linear.append(nn.ReLU())
+            else:
+                s1, s0 = network.Linear[i].weight.shape
+                network.Linear.append(nn.Linear(s0, s1))
+                network.Linear[-1].weight = nn.Parameter(network.Linear[i].weight.detach().clone())
+                network.Linear[-1].bias = nn.Parameter(network.Linear[i].bias.detach().clone())
 
 
 if __name__ == '__main__':
