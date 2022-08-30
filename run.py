@@ -11,7 +11,7 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .0001
+    eps = .01
     verbose = 0
     virtualBranching = False
     numberOfVirtualBranches = 4,
@@ -21,6 +21,7 @@ def main():
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
     finalHorizon = 3
+    initialGD = False
 
     if torch.cuda.is_available():
         device = torch.device("cuda", 0)
@@ -28,19 +29,20 @@ def main():
         device = torch.device("cpu")
 
     # Temporary
-    device=torch.device("cpu")
+    device = torch.device("cpu")
     print(device)
     print(' ')
 
-    # pathToStateDictionary = "Networks/randomNetwork.pth"
-    # pathToStateDictionary = "Networks/randomNetwork2.pth"
-    # pathToStateDictionary = "Networks/randomNetwork3.pth"
-    pathToStateDictionary = "Networks/trainedNetwork1.pth"
-    # pathToStateDictionary = "Networks/RobotArmStateDict2-5-2.pth"
-    # pathToStateDictionary = "Networks/Test3-5-3.pth"
-    # pathToStateDictionary = "Networks/ACASXU.pth"
-    # pathToStateDictionary = "Networks/mnist_3_50.pth"
+    # fileName = "randomNetwork.pth"
+    # fileName = "randomNetwork2.pth"
+    # fileName = "randomNetwork3.pth"
+    fileName = "trainedNetwork1.pth"
+    # fileName = "RobotArmStateDict2-5-2.pth"
+    # fileName = "Test3-5-3.pth"
+    # fileName = "ACASXU.pth"
+    # fileName = "mnist_3_50.pth"
 
+    pathToStateDictionary = "Networks/" + fileName
     network = NeuralNetwork(pathToStateDictionary)
 
 
@@ -52,10 +54,32 @@ def main():
     lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
     upperCoordinate = torch.Tensor([1., 1.]).to(device)
 
+    # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3, torch.pi / 3]).to(device)
+    # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
+    # if "ACAS" in pathToStateDictionary or "mnist" in pathToStateDictionary:
+    #     lowerCoordinate = torch.Tensor([-2. / 2560] * dim).to(device)
+    #     upperCoordinate = torch.Tensor([2. / 2560] * dim).to(device)
+    #     # lowerCoordinate = torch.Tensor([-1.] * dim).to(device)
+    #     # upperCoordinate = torch.Tensor([1.] * dim).to(device)
+    #     # c = torch.ones(outputDim).to(device)
+    #     c = torch.zeros(outputDim, dtype=torch.float).to(device)
+    #     if "mnist" in pathToStateDictionary:
+    #         df = pd.read_csv("mnistTestData.csv")
+    #         testImage = torch.Tensor(df.loc[0].to_numpy()[1:] / 255.).to(device)
+    #         lowerCoordinate += testImage
+    #         upperCoordinate += testImage
+    #         testLabel = df.loc[0].label
+    #         c[testLabel] = 1.
+    #         try:
+    #             c[testLabel + 1] = -1
+    #         except:
+    #             c[testLabel - 1] = -1
+    #     else:
+    #         c[0] = 1.
+    #         c[1] = -1
+
     startTime = time.time()
 
-    previousRotationMatrix = np.eye(dim, dim)
-    previousRotationBias = np.zeros(dim)
 
     for iteration in range(finalHorizon):
         inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
@@ -76,8 +100,8 @@ def main():
 
         plt.figure()
         plt.scatter(imageData[:, 0], imageData[:, 1], marker='.')
-        plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 100000, data_comp[0, 1] / 100000, width=0.000003)
-        plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 100000, data_comp[1, 1] / 100000, width=0.000003)
+        plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 10000, data_comp[0, 1] / 10000, width=0.000003)
+        plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 10000, data_comp[1, 1] / 10000, width=0.000003)
         
         pcaDirections = []
         for direction in data_comp:
@@ -99,57 +123,36 @@ def main():
                                 normToUseLipschitz=normToUseLipschitz, useTwoNormDilation=useTwoNormDilation,
                                 useSdpForLipschitzCalculation=useSdpForLipschitzCalculation,
                                 lipschitzSdpSolverVerbose=lipschitzSdpSolverVerbose,
-                                initialGD=False, rotationMatrix=torch.from_numpy(previousRotationMatrix).float().to(device), 
-                                rotationConstant=torch.from_numpy(previousRotationBias).float().to(device)
+                                initialGD=initialGD
                                 )
             lowerBound, upperBound, space_left = BB.run()
             calculatedLowerBoundsforpcaDirections[i] = lowerBound
             print(' ')
             print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
 
-        
-        previousRotationMatrix = data_comp
-        previousRotationBias = data_mean
         rotation = nn.Linear(dim, dim)
         rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
         rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
         network.rotation = rotation
 
-        # print(pcaDirections)
-        # print(calculatedLowerBoundsforpcaDirections )
-        # calculatedLowerBoundsforpcaDirections = -calculatedLowerBoundsforpcaDirections
         for i, component in enumerate(data_comp):
             upperCoordinate[i] = -calculatedLowerBoundsforpcaDirections[2 * i]
             lowerCoordinate[i] = calculatedLowerBoundsforpcaDirections[2 * i + 1]
 
         x0 = np.array([torch.min(imageData[:, 0]).numpy() - eps, torch.max(imageData[:, 0]).numpy() + eps])
         for i in range(len(upperCoordinate)):
-            # c = -upperCoordinateMultiplier[i] * pcaDirections[i]
-            c = pcaDirections[2 * i + 1]
+            c = data_comp[i]
             y0 = (upperCoordinate[i] - c[0] * x0)/c[1]
             plt.plot(x0, y0)
 
             y0 = (lowerCoordinate[i] - c[0] * x0)/c[1]
             plt.plot(x0, y0)
 
-        # plt.gca().set_aspect('equal', adjustable='box')
-
-        # x1 = np.array([torch.min(imageData[:, 0]).numpy(), torch.max(imageData[:, 0]).numpy()])
-        # c = data_comp[1]
-        # y1 = (-upperCoordinate[1] - c[0] * x1)/c[1]
-
-        # plt.plot(x1, y1)
-
-        # c = data_comp[1]
-        # y1 = (lowerCoordinate[1] - c[0] * x1)/c[1]
-
-        # plt.plot(x1, y1)
-
         print(upperCoordinate)
         print(lowerCoordinate)
         plt.axis("equal")
 
-        plt.savefig("reachabilityPics/outputIteration" + str(iteration) + ".png")
+        plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
         plt.show()
 
 

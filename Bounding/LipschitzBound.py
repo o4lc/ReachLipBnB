@@ -80,9 +80,9 @@ class LipschitzBounding:
                 timer.start("lowerBound:lipschitzCalc")
                 newWeights = [w.cpu().numpy() for w in self.weights]
                 newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
-                lipschitzConstant = torch.from_numpy(
-                    self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
-                    self.device)
+                # lipschitzConstant = torch.from_numpy(
+                #     self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
+                #     self.device)
                 # normalizer = (lipschitzConstant / 1) ** (1 / len(newWeights))
                 normalizer = 1
                 newWeights = [w / normalizer for w in newWeights]
@@ -95,7 +95,6 @@ class LipschitzBounding:
                     lipschitzConstant = torch.from_numpy(
                         self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
                         self.device)
-                print(len(newWeights))
                 lipschitzConstant *= normalizer ** len(newWeights)
                 print(lipschitzConstant)
                 self.calculatedLipschitzConstants.append(lipschitzConstant)
