@@ -161,7 +161,7 @@ def main():
         plt.axis("equal")
 
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
-        # plt.show()
+        plt.show()
 
 
             

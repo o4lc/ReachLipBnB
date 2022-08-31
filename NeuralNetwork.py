@@ -2,7 +2,7 @@ from packages import *
 
 
 class NeuralNetwork(nn.Module):
-    def __init__(self, path):
+    def __init__(self, path, A=None, B=None, c=None):
         super().__init__()
         stateDictionary = torch.load(path, map_location=torch.device("cpu"))
         layers = []
@@ -16,6 +16,15 @@ class NeuralNetwork(nn.Module):
         )
         self.rotation = nn.Identity()
         self.load_state_dict(stateDictionary)
+        
+        self.A = A
+        self.B = B
+        self.c = c
+        if self.A == None:
+            dimInp = self.Linear[0].weight.shape[1]
+            self.A = torch.zeros((dimInp, dimInp)).float()
+            self.B = torch.eye((dimInp)).float()
+            self.c = torch.zeros(dimInp).float()
 
     def load(self, path):
         stateDict = torch.load(path, map_location=torch.device("cpu"))
@@ -25,4 +34,4 @@ class NeuralNetwork(nn.Module):
     # def train(self):
 
     def forward(self, x):
-        return self.Linear(self.rotation(x))
+        return x @ self.A.T + self.Linear(self.rotation(x)) @ self.B.T + self.c
