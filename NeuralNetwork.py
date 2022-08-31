@@ -30,8 +30,5 @@ class NeuralNetwork(nn.Module):
         stateDict = torch.load(path, map_location=torch.device("cpu"))
         self.load_state_dict(stateDict)
 
-    # @TODO
-    # def train(self):
-
     def forward(self, x):
-        return x @ self.A.T + self.Linear(self.rotation(x)) @ self.B.T + self.c
+        return self.rotation(x) @ self.A.T + self.Linear(self.rotation(x)) @ self.B.T + self.c
