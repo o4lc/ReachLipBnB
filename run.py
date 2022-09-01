@@ -6,6 +6,7 @@ from BranchAndBound import BranchAndBound
 from NeuralNetwork import NeuralNetwork
 import pandas as pd
 from sklearn.decomposition import PCA
+import copy
 
 torch.set_printoptions(precision=8)
 
@@ -23,6 +24,10 @@ def main():
     finalHorizon = 2
     initialGD = False
     performMultiStepSingleHorizon = False
+
+    if finalHorizon > 1 and performMultiStepSingleHorizon and\
+            (normToUseLipschitz != 2 or not useSdpForLipschitzCalculation):
+        raise ValueError
 
     if torch.cuda.is_available():
         device = torch.device("cuda", 0)
@@ -55,7 +60,11 @@ def main():
 
     pathToStateDictionary = "Networks/" + fileName
     network = NeuralNetwork(pathToStateDictionary, A, B, c)
+    horizonForLipschitz = 1
+    originalNetwork = None
     if performMultiStepSingleHorizon:
+        originalNetwork = copy.deepcopy(network)
+        horizonForLipschitz = finalHorizon
         repeatNetwork(network, finalHorizon)
         finalHorizon = 1
 
@@ -142,7 +151,9 @@ def main():
                                 useSdpForLipschitzCalculation=useSdpForLipschitzCalculation,
                                 lipschitzSdpSolverVerbose=lipschitzSdpSolverVerbose,
                                 initialGD=initialGD,
-                                previousLipschitzCalculations=previousLipschitzCalculations
+                                previousLipschitzCalculations=previousLipschitzCalculations,
+                                originalNetwork=originalNetwork,
+                                horizonForLipschitz=horizonForLipschitz
                                 )
             lowerBound, upperBound, space_left = BB.run()
             calculatedLowerBoundsforpcaDirections[i] = lowerBound

@@ -26,10 +26,15 @@ class LipschitzBounding:
                  useSdpForLipschitzCalculation=False,
                  numberOfVirtualBranches=4,
                  sdpSolverVerbose=False,
-                 calculatedLipschitzConstants=[]):
+                 calculatedLipschitzConstants=[],
+                 originalNetwork=None,
+                 horizon=1):
         self.network = network
         self.device = device
-        self.weights = self.extractWeightsFromNetwork(self.network)
+        if originalNetwork:
+            self.weights = self.extractWeightsFromNetwork(originalNetwork)
+        else:
+            self.weights = self.extractWeightsFromNetwork(self.network)
         self.calculatedLipschitzConstants = calculatedLipschitzConstants
         self.maxSearchDepth = maxSearchDepth
         self.performVirtualBranching = virtualBranching
@@ -41,6 +46,7 @@ class LipschitzBounding:
         if normToUse == 2:
             assert (not(self.useSdpForLipschitzCalculation and self.useTwoNormDilation))
         self.sdpSolverVerbose = sdpSolverVerbose
+        self.horizon = horizon
 
     def lowerBound(self,
                    queryCoefficient: torch.Tensor,
@@ -96,10 +102,25 @@ class LipschitzBounding:
                     num_neurons = sum([newWeights[i].shape[0] for i in range(len(newWeights) - 1)])
                     alpha = np.zeros((num_neurons, 1))
                     beta = np.ones((num_neurons, 1))
-                    # lipschitzConstant = torch.Tensor([lipSDP(newWeights, alpha, beta, verbose=self.sdpSolverVerbose)]).to(self.device)
-                    lipschitzConstant = torch.Tensor([lipSDP2(newWeights, alpha, beta, queryCoefficient.unsqueeze(0).cpu().numpy(), 
-                                                verbose=self.sdpSolverVerbose, Asys=self.network.A.cpu().numpy(), 
-                                                Bsys=self.network.B.cpu().numpy())]).to(self.device)
+                    if self.horizon == 1:
+                        # lipschitzConstant = torch.Tensor([lipSDP(newWeights, alpha, beta, verbose=self.sdpSolverVerbose)]).to(self.device)
+                        lipschitzConstant = torch.Tensor([lipSDP2(newWeights, alpha, beta,
+                                                                  queryCoefficient.unsqueeze(0).cpu().numpy(),
+                                                                  self.network.A.cpu().numpy(),
+                                                                  self.network.B.cpu().numpy(),
+                                                                  verbose=self.sdpSolverVerbose)]).to(self.device)
+                    else:
+                        l1 = torch.Tensor([lipSDP2(newWeights, alpha, beta,
+                                                   queryCoefficient.unsqueeze(0).cpu().numpy(),
+                                                   self.network.A.cpu().numpy(),
+                                                   self.network.B.cpu().numpy(),
+                                                   verbose=self.sdpSolverVerbose)]).to(self.device)
+                        l2 = torch.Tensor([lipSDP2(newWeights, alpha, beta,
+                                                   np.eye(self.network.A.shape[0]),
+                                                   self.network.A.cpu().numpy(),
+                                                   self.network.B.cpu().numpy(),
+                                                   verbose=self.sdpSolverVerbose)]).to(self.device)
+                        lipschitzConstant = l1 * l2 ** (self.horizon - 1)
                 else:
                     lipschitzConstant = torch.from_numpy(
                         self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
@@ -429,7 +450,8 @@ def lipSDP(weights, alpha, beta, verbose=False):
 
     return np.sqrt(rho.value)[0][0]
 
-def lipSDP2(weights, alpha, beta, coef, verbose=False, Asys=None, Bsys=None):
+
+def lipSDP2(weights, alpha, beta, coef, Asys, Bsys, verbose=False):
     # @TODO: Possible bug in weights input
     num_layers = len(weights) - 1
     dim_in = weights[0].shape[1]
