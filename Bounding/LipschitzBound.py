@@ -28,8 +28,6 @@ class LipschitzBounding:
                  sdpSolverVerbose=False,
                  calculatedLipschitzConstants=[]):
         self.network = network
-        print(")()())")
-        print(self.network)
         self.device = device
         self.weights = self.extractWeightsFromNetwork(self.network)
         self.calculatedLipschitzConstants = calculatedLipschitzConstants
@@ -432,7 +430,7 @@ def lipSDP(weights, alpha, beta, verbose=False):
     return np.sqrt(rho.value)[0][0]
 
 def lipSDP2(weights, alpha, beta, coef, verbose=False, Asys=None, Bsys=None):
-    # @TODO: Possible nug in weights input
+    # @TODO: Possible bug in weights input
     num_layers = len(weights) - 1
     dim_in = weights[0].shape[1]
     dim_out = weights[-1].shape[0]
@@ -445,15 +443,14 @@ def lipSDP2(weights, alpha, beta, coef, verbose=False, Asys=None, Bsys=None):
     Lambda = cp.Variable((num_neurons, 1), nonneg=True)
     T = cp.diag(Lambda)
     rho = cp.Variable((1, 1), nonneg=True)
-    print([x.shape for x in weights])
     A = weights[0]
     # C = np.bmat([np.zeros((weights[-1].shape[0], dim_in + num_neurons - dim_last_hidden)), weights[-1]])
     E0 = np.bmat([np.eye(weights[0].shape[1]), np.zeros((weights[0].shape[1], dim_in + num_neurons - dim_in))])
     El = np.bmat([np.zeros((weights[-1].shape[1], dim_in + num_neurons - dim_last_hidden)), np.eye(weights[-1].shape[1])])
     # print(Asys.shape, E0.shape)
     # print(Bsys.shape, weights[-1].shape, El.shape)
-    # Asys = coef @ Asys
-    # Bsys = coef @ Bsys
+    Asys = coef @ Asys
+    Bsys = coef @ Bsys
     Cnew = Asys @ E0 + Bsys @ weights[-1] @ El
 
     C = Cnew

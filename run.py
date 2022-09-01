@@ -34,14 +34,6 @@ def main():
     print(device)
     print(' ')
 
-    # @TODO: This is test
-    # A = torch.Tensor([[1, 1], [0, 1]])
-    # B = torch.Tensor([[0.5], [1]])
-    # c = torch.Tensor([0])
-    A = None
-    B = None
-    c = None
-
     # fileName = "randomNetwork.pth"
     fileName = "randomNetwork2.pth"
     # fileName = "randomNetwork3.pth"
@@ -52,6 +44,15 @@ def main():
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
 
+    A = None
+    B = None
+    c = None
+    if fileName == "doubleIntegrator.pth":
+        A = torch.Tensor([[1, 1], [0, 1]])
+        B = torch.Tensor([[0.5], [1]])
+        c = torch.Tensor([0])
+
+
     pathToStateDictionary = "Networks/" + fileName
     network = NeuralNetwork(pathToStateDictionary, A, B, c)
     if performMultiStepSingleHorizon:
@@ -61,9 +62,6 @@ def main():
     dim = network.Linear[0].weight.shape[1]
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
-    print(network)
-    print(network.Linear[-1].weight.shape)
-    print("----")
     # The intial HyperRectangule
     lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
     upperCoordinate = torch.Tensor([1., 1.]).to(device)
@@ -102,7 +100,6 @@ def main():
                 + lowerCoordinate
 
         inputData = Variable(inputData, requires_grad=False)
-        print('\n\n\n\n\n',network.A)
         with no_grad():
             imageData = network.forward(inputData)
 
@@ -112,8 +109,6 @@ def main():
 
         data_mean = pca.mean_
         data_comp = pca.components_
-
-        # print(data_comp[0] @ data_comp[1])
 
         plt.figure()
         plt.scatter(imageData[:, 0], imageData[:, 1], marker='.')
@@ -179,20 +174,9 @@ def main():
             y0 = (lowerCoordinate[i] + centers[i] - c[0] * x0)/c[1]
             plt.plot(x0, y0)
 
-        print(upperCoordinate)
-        print(lowerCoordinate)
-        print("------------------------------------------------")
-        print(network.rotation(torch.Tensor([upperCoordinate[0], upperCoordinate[1]])), torch.Tensor([upperCoordinate[0], upperCoordinate[1]]))
-        print(network.rotation(torch.Tensor([lowerCoordinate[0], upperCoordinate[1]])), torch.Tensor([lowerCoordinate[0], upperCoordinate[1]]))
-        print(network.rotation(torch.Tensor([upperCoordinate[0], lowerCoordinate[1]])), torch.Tensor([upperCoordinate[0], lowerCoordinate[1]]))
-        print(network.rotation(torch.Tensor([lowerCoordinate[0], lowerCoordinate[1]])), torch.Tensor([lowerCoordinate[0], lowerCoordinate[1]]))
-        print()
 
-        # plt.show()
-        # plt.scatter(((imageData.numpy() - data_mean) @ data_comp)[:, 0], ((imageData.numpy() - data_mean) @ data_comp)[:, 1])
         plt.axis("equal")
-
-        # plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
+        plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
         plt.show()
 
 
