@@ -12,7 +12,7 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .03
+    eps = .001
     verbose = 0
     virtualBranching = False
     numberOfVirtualBranches = 4,
@@ -21,9 +21,9 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 2
+    finalHorizon = 5
     initialGD = False
-    performMultiStepSingleHorizon = False
+    performMultiStepSingleHorizon = True
 
     if finalHorizon > 1 and performMultiStepSingleHorizon and\
             (normToUseLipschitz != 2 or not useSdpForLipschitzCalculation):
@@ -40,10 +40,10 @@ def main():
     print(' ')
 
     # fileName = "randomNetwork.pth"
-    fileName = "randomNetwork2.pth"
+    # fileName = "randomNetwork2.pth"
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
-    # fileName = "doubleIntegrator.pth"
+    fileName = "doubleIntegrator.pth"
     # fileName = "RobotArmStateDict2-5-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
@@ -65,17 +65,18 @@ def main():
     if performMultiStepSingleHorizon:
         originalNetwork = copy.deepcopy(network)
         horizonForLipschitz = finalHorizon
-        repeatNetwork(network, finalHorizon)
+        network.repetition = finalHorizon
+        # repeatNetwork(network, finalHorizon)
         finalHorizon = 1
 
     dim = network.Linear[0].weight.shape[1]
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
     # The intial HyperRectangule
-    lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
-    upperCoordinate = torch.Tensor([1., 1.]).to(device)
-    # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
-    # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+    # lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
+    # upperCoordinate = torch.Tensor([1., 1.]).to(device)
+    lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
+    upperCoordinate = torch.Tensor([2., 2.5]).to(device)
 
     # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3, torch.pi / 3]).to(device)
     # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
@@ -200,16 +201,46 @@ def main():
 
 
 def repeatNetwork(network, horizon):
+    # originalNetworkLength = len(network.Linear)
+    # for j in range(horizon - 1):
+    #     for i in range(originalNetworkLength):
+    #         if type(network.Linear[i]) == nn.modules.activation.ReLU:
+    #             network.Linear.append(nn.ReLU())
+    #         else:
+    #             s1, s0 = network.Linear[i].weight.shape
+    #             network.Linear.append(nn.Linear(s0, s1))
+    #             network.Linear[-1].weight = nn.Parameter(network.Linear[i].weight.detach().clone())
+    #             network.Linear[-1].bias = nn.Parameter(network.Linear[i].bias.detach().clone())
+    numberOfRepeats = horizon - 1
     originalNetworkLength = len(network.Linear)
-    for j in range(horizon - 1):
+
+    w0 = network.Linear[0].weight.detach().clone()
+    wLast = network.Linear[originalNetworkLength - 1].weight.detach().clone()
+    b0 = network.Linear[0].bias.detach().clone()
+    bLast = network.Linear[originalNetworkLength - 1].bias.detach().clone().unsqueeze(1)
+    weight = w0 @ wLast
+    bias = (w0 @ bLast).squeeze() + b0
+
+    for j in range(numberOfRepeats):
         for i in range(originalNetworkLength):
             if type(network.Linear[i]) == nn.modules.activation.ReLU:
                 network.Linear.append(nn.ReLU())
             else:
-                s1, s0 = network.Linear[i].weight.shape
-                network.Linear.append(nn.Linear(s0, s1))
-                network.Linear[-1].weight = nn.Parameter(network.Linear[i].weight.detach().clone())
-                network.Linear[-1].bias = nn.Parameter(network.Linear[i].bias.detach().clone())
+                if i == 0:
+
+                    network.Linear[-1] = nn.Linear(weight.shape[1], weight.shape[0])
+                    network.Linear[-1].weight = nn.Parameter(weight)
+                    network.Linear[-1].bias = nn.Parameter(bias)
+
+                elif i < originalNetworkLength - 1 or j < numberOfRepeats - 1:
+                    s1, s0 = network.Linear[i].weight.shape
+                    network.Linear.append(nn.Linear(s0, s1))
+                    network.Linear[-1].weight = nn.Parameter(network.Linear[i].weight.detach().clone())
+                    network.Linear[-1].bias = nn.Parameter(network.Linear[i].bias.detach().clone())
+
+    network.Linear.append(nn.Linear(wLast.shape[1], wLast.shape[0]))
+    network.Linear[-1].weight = nn.Parameter(wLast)
+    network.Linear[-1].bias = nn.Parameter(bLast.squeeze())
 
 
 if __name__ == '__main__':
