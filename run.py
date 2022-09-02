@@ -21,7 +21,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 5
+    finalHorizon = 4
     initialGD = False
     performMultiStepSingleHorizon = True
 
