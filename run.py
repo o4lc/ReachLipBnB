@@ -11,7 +11,7 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .03
+    eps = .0001
     verbose = 0
     virtualBranching = False
     numberOfVirtualBranches = 4,
@@ -20,7 +20,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 2
+    finalHorizon = 1
     initialGD = False
     performMultiStepSingleHorizon = False
 
@@ -35,9 +35,9 @@ def main():
     print(' ')
 
     # fileName = "randomNetwork.pth"
-    fileName = "randomNetwork2.pth"
+    # fileName = "randomNetwork2.pth"
     # fileName = "randomNetwork3.pth"
-    # fileName = "trainedNetwork1.pth"
+    fileName = "trainedNetwork1.pth"
     # fileName = "doubleIntegrator.pth"
     # fileName = "RobotArmStateDict2-5-2.pth"
     # fileName = "Test3-5-3.pth"
@@ -177,7 +177,7 @@ def main():
 
         plt.axis("equal")
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
-        plt.show()
+        # plt.show()
 
 
             
