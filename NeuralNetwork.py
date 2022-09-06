@@ -20,7 +20,7 @@ class NeuralNetwork(nn.Module):
         self.A = A
         self.B = B
         self.c = c
-        if self.A == None:
+        if self.A is None:
             dimInp = self.Linear[0].weight.shape[1]
             self.A = torch.zeros((dimInp, dimInp)).float()
             self.B = torch.eye((dimInp)).float()

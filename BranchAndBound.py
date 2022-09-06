@@ -214,7 +214,7 @@ class BranchAndBound:
                 # print('--------------------')
 
         if self.verbose:
-            plotter.showAnimation()
+            plotter.showAnimation(self.spaceNodes)
         self.timers.pauseAll()
         self.timers.print()
         print(self.lowerBoundClass.calculatedLipschitzConstants)
