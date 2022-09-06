@@ -185,6 +185,8 @@ class BranchAndBound:
             plotter = Plotter()
 
         self.bound([0], self.bestUpperBound, self.bestLowerBound)
+        if self.scoreFunction == "worstLowerBound" or self.scoreFunction == "bestLowerBound":
+            self.spaceNodes[0].calc_score()
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
             print(len(self.spaceNodes))
             # for i in range(len(self.spaceNodes)):
@@ -202,6 +204,19 @@ class BranchAndBound:
             self.timers.pause("branch")
 
             self.bound(indices, deletedUb, deletedLb)
+
+            if self.scoreFunction == "worstLowerBound" or self.scoreFunction == "bestLowerBound":
+                minimumIndex = len(self.spaceNodes) - self.branchNodeNum * self.nodeBranchingFactor
+                if minimumIndex < 0:
+                    minimumIndex = 0
+                # minimumIndex = 0
+                maximumIndex = len(self.spaceNodes)
+                for i in range(minimumIndex, maximumIndex):
+                    self.spaceNodes[i].score = self.spaceNodes[i].calc_score()
+
+                    # print(self.spaceNodes[i].lower)
+
+
             self.timers.start("bestBound")
 
             # TODO: make this better by keeping the previous one.

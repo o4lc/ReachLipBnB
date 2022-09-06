@@ -3,6 +3,7 @@ clc;
 clear all;
 close all;
 set(0,'DefaultFigureWindowStyle','docked')
+dt = 0.1;
 
 g = 9.8;
 A = [zeros(3, 3), eye(3);
@@ -11,6 +12,9 @@ B = [zeros(3, 3)
     g 0 0
     0 -g 0
     0 0 1];
+
+A = eye(6) + dt * A;
+B = dt * B;
 
 nx = size(A, 1); nu = size(B, 2);
 

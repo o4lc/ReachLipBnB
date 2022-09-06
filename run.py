@@ -12,8 +12,9 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .03
+    eps = .05
     verbose = 0
+    scoreFunction = 'worstLowerBound'
     virtualBranching = False
     numberOfVirtualBranches = 4
     maxSearchDepthLipschitzBound = 10
@@ -43,8 +44,8 @@ def main():
     # fileName = "randomNetwork2.pth"
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
-    fileName = "doubleIntegrator.pth"
-    # fileName = "RobotArmStateDict2-5-2.pth"
+    # fileName = "doubleIntegrator.pth"
+    fileName = "RobotArmStateDict2-5-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
@@ -73,10 +74,10 @@ def main():
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
     # The intial HyperRectangule
-    # lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
-    # upperCoordinate = torch.Tensor([1., 1.]).to(device)
-    lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
-    upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+    lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
+    upperCoordinate = torch.Tensor([1., 1.]).to(device)
+    # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
+    # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
 
     # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3, torch.pi / 3]).to(device)
     # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
@@ -147,7 +148,7 @@ def main():
 
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
                                 queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
-                                scoreFunction='length',
+                                scoreFunction=scoreFunction,
                                 pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5, virtualBranching=virtualBranching,
                                 numberOfVirtualBranches=numberOfVirtualBranches,
                                 maxSearchDepthLipschitzBound=maxSearchDepthLipschitzBound,
