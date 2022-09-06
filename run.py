@@ -20,7 +20,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 1
+    finalHorizon = 3
     initialGD = False
     performMultiStepSingleHorizon = False
 
@@ -37,8 +37,8 @@ def main():
     # fileName = "randomNetwork.pth"
     # fileName = "randomNetwork2.pth"
     # fileName = "randomNetwork3.pth"
-    fileName = "trainedNetwork1.pth"
-    # fileName = "doubleIntegrator.pth"
+    # fileName = "trainedNetwork1.pth"
+    fileName = "doubleIntegrator.pth"
     # fileName = "RobotArmStateDict2-5-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
@@ -63,10 +63,10 @@ def main():
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
     # The intial HyperRectangule
-    lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
-    upperCoordinate = torch.Tensor([1., 1.]).to(device)
-    # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
-    # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+    # lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
+    # upperCoordinate = torch.Tensor([1., 1.]).to(device)
+    lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
+    upperCoordinate = torch.Tensor([2., 2.5]).to(device)
 
     # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3, torch.pi / 3]).to(device)
     # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
@@ -109,11 +109,14 @@ def main():
 
         data_mean = pca.mean_
         data_comp = pca.components_
+        data_sd = np.sqrt(pca.explained_variance_)
+
+        # print(np.linalg.norm(data_comp, 2, 1))
 
         plt.figure()
         plt.scatter(imageData[:, 0], imageData[:, 1], marker='.')
-        plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 10000, data_comp[0, 1] / 10000, width=0.000003)
-        plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 10000, data_comp[1, 1] / 10000, width=0.000003)
+        plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / data_sd[0] / 2, data_comp[0, 1] / data_sd[0] / 2, width=0.001)
+        plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / data_sd[1] / 2, data_comp[1, 1] / data_sd[1] / 2, width=0.001)
         
         pcaDirections = []
         for direction in data_comp:
@@ -149,18 +152,13 @@ def main():
             print(' ')
             print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
 
-        rotation = nn.Linear(dim, dim)
-        rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
-        rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
-        network.rotation = rotation
-
-
 
         centers = []
         for i, component in enumerate(data_comp):
             u = -calculatedLowerBoundsforpcaDirections[2 * i]
             l = calculatedLowerBoundsforpcaDirections[2 * i + 1]
-            center = (u + l) / 2
+            # center = (u + l) / 2
+            center = component @ data_mean
             centers.append(center)
             upperCoordinate[i] = u - center
             lowerCoordinate[i] = l - center
@@ -177,7 +175,12 @@ def main():
 
         plt.axis("equal")
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
-        # plt.show()
+        plt.show()
+
+        rotation = nn.Linear(dim, dim)
+        rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
+        rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
+        network.rotation = rotation
 
 
             
