@@ -9,7 +9,7 @@ class BB_node:
         self.coordUpper = coordUp
         self.coordLower = coordLow
         self.scoreFunction = scoreFunction
-
+        self.score = None
         self.score = self.calc_score()
     
     def calc_score(self):
@@ -24,6 +24,10 @@ class BB_node:
 
         elif self.scoreFunction == 'condNum':
             return torch.max(dilation) / torch.min(dilation)
+        elif self.scoreFunction == "worstLowerBound":
+            return -self.lower
+        elif self.scoreFunction == "bestLowerBound":
+            return self.lower
 
     def __repr__(self):
         return str(self.coordLower) + ' ≤ ' + str(self.coordUpper)

@@ -13,8 +13,8 @@ torch.set_printoptions(precision=8)
 def main():
 
     eps = .05
-    verbose = 1
-    verboseMultiHorizon = 0
+    verbose = 0
+    scoreFunction = 'worstLowerBound'
     virtualBranching = False
     numberOfVirtualBranches = 4
     maxSearchDepthLipschitzBound = 10
@@ -45,7 +45,6 @@ def main():
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
     # fileName = "doubleIntegrator.pth"
-    # fileName = "quadRotor.pth"
     fileName = "RobotArmStateDict2-5-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
@@ -91,6 +90,10 @@ def main():
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
     # The intial HyperRectangule
+    lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
+    upperCoordinate = torch.Tensor([1., 1.]).to(device)
+    # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
+    # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
     # lowerCoordinate = torch.Tensor([4.65, 4.65, 2.95, 0.94, -0.01, -0.01]).to(device)
     # upperCoordinate = torch.Tensor([4.75, 4.75 ,3.05, 0.96,  0.01,  0.01 ]).to(device)
     # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
@@ -125,7 +128,7 @@ def main():
         inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
             + lowerCoordinate
         plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
-    
+
 
 
     startTime = time.time()
@@ -173,7 +176,7 @@ def main():
 
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
                                 queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
-                                scoreFunction='condNum',
+                                scoreFunction=scoreFunction,
                                 pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5, virtualBranching=virtualBranching,
                                 numberOfVirtualBranches=numberOfVirtualBranches,
                                 maxSearchDepthLipschitzBound=maxSearchDepthLipschitzBound,
@@ -201,9 +204,9 @@ def main():
             upperCoordinate[i] = u - center
             lowerCoordinate[i] = l - center
 
-            
 
-        xx = np.array([[torch.min(imageData[:, i]).numpy() - eps, 
+
+        xx = np.array([[torch.min(imageData[:, i]).numpy() - eps,
                         torch.max(imageData[:, i]).numpy() + eps] for i in range(1, len(imageData[0]))])
 
         if verboseMultiHorizon:
