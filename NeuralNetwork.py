@@ -25,10 +25,14 @@ class NeuralNetwork(nn.Module):
             self.A = torch.zeros((dimInp, dimInp)).float()
             self.B = torch.eye((dimInp)).float()
             self.c = torch.zeros(dimInp).float()
+        self.repetition = 1
 
     def load(self, path):
         stateDict = torch.load(path, map_location=torch.device("cpu"))
         self.load_state_dict(stateDict)
 
     def forward(self, x):
-        return self.rotation(x) @ self.A.T + self.Linear(self.rotation(x)) @ self.B.T + self.c
+        x = self.rotation(x)
+        for i in range(self.repetition):
+            x = x @ self.A.T + self.Linear(x) @ self.B.T + self.c
+        return x
