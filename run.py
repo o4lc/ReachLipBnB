@@ -12,8 +12,9 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .03
-    verbose = 0
+    eps = .05
+    verbose = 1
+    verboseMultiHorizon = 0
     virtualBranching = False
     numberOfVirtualBranches = 4
     maxSearchDepthLipschitzBound = 10
@@ -21,7 +22,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 2
+    finalHorizon = 1
     initialGD = False
     performMultiStepSingleHorizon = False
 
@@ -43,8 +44,9 @@ def main():
     # fileName = "randomNetwork2.pth"
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
-    fileName = "doubleIntegrator.pth"
-    # fileName = "RobotArmStateDict2-5-2.pth"
+    # fileName = "doubleIntegrator.pth"
+    # fileName = "quadRotor.pth"
+    fileName = "RobotArmStateDict2-5-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
@@ -56,6 +58,22 @@ def main():
         A = torch.Tensor([[1, 1], [0, 1]])
         B = torch.Tensor([[0.5], [1]])
         c = torch.Tensor([0])
+    elif fileName == "quadRotor.pth":
+        A = torch.Tensor([  [0., 0, 0, 1, 0, 0],
+                            [0, 0, 0, 0, 1, 0],
+                            [0, 0, 0, 0, 0, 1],
+                            [0, 0, 0, 0, 0, 0],
+                            [0, 0, 0, 0, 0, 0],
+                            [0, 0, 0, 0, 0, 0]])
+        B = torch.Tensor([  [ 0. ,  0. ,  0. ],
+                            [ 0. ,  0. ,  0. ],
+                            [ 0. ,  0. ,  0. ],
+                            [ 9.8,  0. ,  0. ],
+                            [ 0. , -9.8,  0. ],
+                            [ 0. ,  0. ,  1. ]])
+
+        c = torch.Tensor([0, 0, 0, 0, 0, -9.8])
+
 
 
     pathToStateDictionary = "Networks/" + fileName
@@ -73,13 +91,13 @@ def main():
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
     # The intial HyperRectangule
-    # lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
-    # upperCoordinate = torch.Tensor([1., 1.]).to(device)
-    lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
-    upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+    # lowerCoordinate = torch.Tensor([4.65, 4.65, 2.95, 0.94, -0.01, -0.01]).to(device)
+    # upperCoordinate = torch.Tensor([4.75, 4.75 ,3.05, 0.96,  0.01,  0.01 ]).to(device)
+    # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
+    # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
 
-    # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3, torch.pi / 3]).to(device)
-    # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
+    lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3]).to(device)
+    upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
     # if "ACAS" in pathToStateDictionary or "mnist" in pathToStateDictionary:
     #     lowerCoordinate = torch.Tensor([-2. / 2560] * dim).to(device)
     #     upperCoordinate = torch.Tensor([2. / 2560] * dim).to(device)
@@ -102,6 +120,14 @@ def main():
     #         c[0] = 1.
     #         c[1] = -1
 
+    if verboseMultiHorizon:
+        plt.figure()
+        inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
+            + lowerCoordinate
+        plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
+    
+
+
     startTime = time.time()
 
     for iteration in range(finalHorizon):
@@ -123,10 +149,11 @@ def main():
 
         # print(np.linalg.norm(data_comp, 2, 1))
 
-        plt.figure()
-        plt.scatter(imageData[:, 0], imageData[:, 1], marker='.')
-        plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / data_sd[0] / 2, data_comp[0, 1] / data_sd[0] / 2, width=0.001)
-        plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / data_sd[1] / 2, data_comp[1, 1] / data_sd[1] / 2, width=0.001)
+        if verboseMultiHorizon:
+            # plt.figure()
+            plt.scatter(imageData[:, 0], imageData[:, 1], marker='.', label='Horizon' + str(iteration), alpha=0.5)
+            # plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 10000, data_comp[0, 1] / 10000, width=0.000003)
+            # plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 10000, data_comp[1, 1] / 10000, width=0.000003)
         
         pcaDirections = []
         for direction in data_comp:
@@ -137,7 +164,6 @@ def main():
         calculatedLowerBoundsforpcaDirections = torch.Tensor(np.zeros(len(pcaDirections)))
         
 
-
         for i in range(len(pcaDirections)):
             previousLipschitzCalculations = []
             if i % 2 == 1 and torch.allclose(pcaDirections[i], -pcaDirections[i - 1]):
@@ -147,7 +173,7 @@ def main():
 
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
                                 queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
-                                scoreFunction='length',
+                                scoreFunction='condNum',
                                 pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5, virtualBranching=virtualBranching,
                                 numberOfVirtualBranches=numberOfVirtualBranches,
                                 maxSearchDepthLipschitzBound=maxSearchDepthLipschitzBound,
@@ -175,19 +201,30 @@ def main():
             upperCoordinate[i] = u - center
             lowerCoordinate[i] = l - center
 
-        x0 = np.array([torch.min(imageData[:, 0]).numpy() - eps, torch.max(imageData[:, 0]).numpy() + eps])
-        for i in range(len(upperCoordinate)):
-            c = data_comp[i]
-            y0 = (upperCoordinate[i] + centers[i] - c[0] * x0)/c[1]
-            plt.plot(x0, y0)
+            
 
-            y0 = (lowerCoordinate[i] + centers[i] - c[0] * x0)/c[1]
-            plt.plot(x0, y0)
+        xx = np.array([[torch.min(imageData[:, i]).numpy() - eps, 
+                        torch.max(imageData[:, i]).numpy() + eps] for i in range(1, len(imageData[0]))])
+
+        if verboseMultiHorizon:
+            for i in range(len(data_comp)):
+                c = data_comp[i]
+                if c[0] != 0:
+                    yy = (upperCoordinate[i] + centers[i] - c[1:] @ xx)/c[0]
+                    plt.plot(yy, xx[0], '--',  c='grey')
+
+                    yy = (lowerCoordinate[i] + centers[i] - c[1:] @ xx)/c[0]
+                    plt.plot(yy, xx[0], '--', c='grey')
+                else:
+                    raise
 
 
-        plt.axis("equal")
-        plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
-        # plt.show()
+            plt.axis("equal")
+            plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
+            plt.legend()
+
+    if verboseMultiHorizon:
+        plt.show()
 
         rotation = nn.Linear(dim, dim)
         rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
@@ -247,3 +284,4 @@ def repeatNetwork(network, horizon):
 
 if __name__ == '__main__':
     main()
+    plt.show()
