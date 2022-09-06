@@ -15,15 +15,15 @@ def main():
     eps = .001
     verbose = 0
     virtualBranching = False
-    numberOfVirtualBranches = 4,
-    maxSearchDepthLipschitzBound = 10,
+    numberOfVirtualBranches = 4
+    maxSearchDepthLipschitzBound = 10
     normToUseLipschitz = 2
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
     finalHorizon = 4
     initialGD = False
-    performMultiStepSingleHorizon = True
+    performMultiStepSingleHorizon = False
 
     if finalHorizon > 1 and performMultiStepSingleHorizon and\
             (normToUseLipschitz != 2 or not useSdpForLipschitzCalculation):
@@ -172,7 +172,8 @@ def main():
         for i, component in enumerate(data_comp):
             u = -calculatedLowerBoundsforpcaDirections[2 * i]
             l = calculatedLowerBoundsforpcaDirections[2 * i + 1]
-            center = (u + l) / 2
+            # center = (u + l) / 2
+            center = component @ data_mean
             centers.append(center)
             upperCoordinate[i] = u - center
             lowerCoordinate[i] = l - center
@@ -189,7 +190,7 @@ def main():
 
         plt.axis("equal")
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
-        plt.show()
+        # plt.show()
 
 
             
