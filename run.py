@@ -195,9 +195,10 @@ def main():
             print(' ')
             print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
 
-            # # @TODO: 
-            # break
-
+        rotation = nn.Linear(dim, dim)
+        rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
+        rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
+        network.rotation = rotation
 
         centers = []
         for i, component in enumerate(data_comp):
@@ -253,10 +254,7 @@ def main():
 
 
 
-        rotation = nn.Linear(dim, dim)
-        rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
-        rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
-        network.rotation = rotation
+
 
     if verboseMultiHorizon:
         plt.show()

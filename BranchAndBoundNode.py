@@ -12,22 +12,36 @@ class BB_node:
         self.score = None
         self.score = self.calc_score()
     
-    def calc_score(self):
+    def calc_score(self, scoreFunction=None):
         #@TODO
         # Temp scoring function
+        if scoreFunction is None:
+            scoreFunction = self.scoreFunction
         dilation = self.coordUpper - self.coordLower
-        if self.scoreFunction == 'length':
+        if scoreFunction == 'length':
             return torch.max(dilation)
         
-        elif self.scoreFunction == 'volume':
+        elif scoreFunction == 'volume':
             return torch.prod(dilation)
 
-        elif self.scoreFunction == 'condNum':
+        elif scoreFunction == 'condNum':
             return torch.max(dilation) / torch.min(dilation)
-        elif self.scoreFunction == "worstLowerBound":
+        elif scoreFunction == "worstLowerBound":
             return -self.lower
-        elif self.scoreFunction == "bestLowerBound":
+        elif scoreFunction == "bestLowerBound":
             return self.lower
+        elif scoreFunction == "bestUpperBound":
+            return -self.upper
+        elif scoreFunction == "worstUpperBound":
+            return self.upper
+        elif scoreFunction == "averageBounds":
+            return (self.upper - self.lower) / 2
+        elif scoreFunction.find("*") >= 0:
+            index = scoreFunction.find("*")
+            return self.calc_score(scoreFunction[:index]) * self.calc_score(scoreFunction[index + 1:])
+        elif scoreFunction == "weightedGap":
+            w = .9
+            return -self.lower * w + self.upper * (1 - w)
 
     def __repr__(self):
         return str(self.coordLower) + ' ≤ ' + str(self.coordUpper)
