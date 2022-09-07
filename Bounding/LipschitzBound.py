@@ -126,7 +126,7 @@ class LipschitzBounding:
                         self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
                         self.device)
                 lipschitzConstant *= normalizer ** len(newWeights)
-                print(lipschitzConstant)
+                # print(lipschitzConstant)
                 self.calculatedLipschitzConstants.append(lipschitzConstant)
                 self.pauseTime(timer, "lowerBound:lipschitzCalc")
             else:

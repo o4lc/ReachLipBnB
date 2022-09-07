@@ -11,7 +11,7 @@ from Utilities.Timer import Timers
 
 
 class BranchAndBound:
-    def __init__(self, coordUp=None, coordLow=None, verbose=False, pgdStepSize=1e-3,
+    def __init__(self, coordUp=None, coordLow=None, verbose=False, verboseEssential=False, pgdStepSize=1e-3,
                  inputDimension=2, eps=0.1, network=None, queryCoefficient=None,
                  pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
                  maximumBatchSize=256,  nodeBranchingFactor=2, branchNodeNum = 1,
@@ -30,6 +30,7 @@ class BranchAndBound:
         self.initCoordUp = coordUp
         self.initCoordLow = coordLow
         self.verbose = verbose
+        self.verboseEssential = verboseEssential
         self.pgdIterNum = pgdIterNum
         self.pgdNumberOfInitializations = pgdNumberOfInitializations
         self.inputDimension = inputDimension
@@ -177,7 +178,8 @@ class BranchAndBound:
 
 
             self.bestUpperBound = torch.Tensor(initUpperBoundClass.upperBound([0], self.spaceNodes, self.queryCoefficient))
-            print(self.bestUpperBound)
+            if self.verboseEssential:
+                print(self.bestUpperBound)
         else:
             self.bestUpperBound = torch.Tensor([torch.inf]).to(self.device)
         self.bestLowerBound = torch.Tensor([-torch.inf]).to(self.device)
@@ -190,7 +192,8 @@ class BranchAndBound:
                                   "averageBounds", "weightedGap"]:
             self.spaceNodes[0].score = self.spaceNodes[0].calc_score()
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
-            print(len(self.spaceNodes))
+            if self.verboseEssential:
+                print(len(self.spaceNodes))
             # for i in range(len(self.spaceNodes)):
             #     if self.spaceNodes[i].lower > self.spaceNodes[i].upper:
             #         print("@@: ", i, self.spaceNodes[i].lower, self.spaceNodes[i].upper)
@@ -226,7 +229,8 @@ class BranchAndBound:
                 torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
             self.timers.pause("bestBound")
             #1.08618
-            print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound, "diff", self.bestUpperBound - self.bestLowerBound)
+            if self.verboseEssential:
+                print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound, "diff", self.bestUpperBound - self.bestLowerBound)
 
             if self.verbose:
                 # print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound)
@@ -237,9 +241,10 @@ class BranchAndBound:
 
             plotter.showAnimation(self.spaceNodes)
         self.timers.pauseAll()
-        self.timers.print()
-        print(self.lowerBoundClass.calculatedLipschitzConstants)
-        print("number of calculated lipschitz constants ", len(self.lowerBoundClass.calculatedLipschitzConstants))
+        if self.verboseEssential:
+            self.timers.print()
+            print(self.lowerBoundClass.calculatedLipschitzConstants)
+            print("number of calculated lipschitz constants ", len(self.lowerBoundClass.calculatedLipschitzConstants))
 
         return self.bestLowerBound, self.bestUpperBound, self.spaceNodes
 

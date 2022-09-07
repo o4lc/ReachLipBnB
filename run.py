@@ -14,7 +14,8 @@ def main():
 
     eps = .05
     verbose = 0
-    verboseMultiHorizon = 1
+    verboseMultiHorizon = 0
+    verboseEssential = 0
     scoreFunction = 'worstLowerBound'
     virtualBranching = False
     numberOfVirtualBranches = 4
@@ -23,7 +24,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 1
+    finalHorizon = 4
     initialGD = False
     performMultiStepSingleHorizon = False
 
@@ -46,7 +47,7 @@ def main():
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
     fileName = "doubleIntegrator.pth"
-    # fileName = "RobotArmStateDict2-5-2.pth"
+    # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
@@ -176,8 +177,8 @@ def main():
             c = pcaDirections[i]
             print('** Solving with coefficient =', c)
 
-            BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, inputDimension=dim, eps=eps, network=network,
-                                queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
+            BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, verboseEssential=verboseEssential, inputDimension=dim,
+                                eps=eps, network=network, queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
                                 scoreFunction=scoreFunction,
                                 pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5, virtualBranching=virtualBranching,
                                 numberOfVirtualBranches=numberOfVirtualBranches,
