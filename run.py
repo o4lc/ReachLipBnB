@@ -14,6 +14,7 @@ def main():
 
     eps = .05
     verbose = 0
+    verboseMultiHorizon = 1
     scoreFunction = 'worstLowerBound'
     virtualBranching = False
     numberOfVirtualBranches = 4
@@ -44,8 +45,8 @@ def main():
     # fileName = "randomNetwork2.pth"
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
-    # fileName = "doubleIntegrator.pth"
-    fileName = "RobotArmStateDict2-5-2.pth"
+    fileName = "doubleIntegrator.pth"
+    # fileName = "RobotArmStateDict2-5-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
@@ -90,17 +91,17 @@ def main():
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
     # The intial HyperRectangule
-    lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
-    upperCoordinate = torch.Tensor([1., 1.]).to(device)
+    # lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
+    # upperCoordinate = torch.Tensor([1., 1.]).to(device)
     # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
     # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
     # lowerCoordinate = torch.Tensor([4.65, 4.65, 2.95, 0.94, -0.01, -0.01]).to(device)
     # upperCoordinate = torch.Tensor([4.75, 4.75 ,3.05, 0.96,  0.01,  0.01 ]).to(device)
-    # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
-    # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+    lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
+    upperCoordinate = torch.Tensor([2., 2.5]).to(device)
 
-    lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3]).to(device)
-    upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
+    # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3]).to(device)
+    # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
     # if "ACAS" in pathToStateDictionary or "mnist" in pathToStateDictionary:
     #     lowerCoordinate = torch.Tensor([-2. / 2560] * dim).to(device)
     #     upperCoordinate = torch.Tensor([2. / 2560] * dim).to(device)
@@ -124,7 +125,8 @@ def main():
     #         c[1] = -1
 
     if verboseMultiHorizon:
-        plt.figure()
+        # fig = plt.figure()
+        fig, ax = plt.subplots()
         inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
             + lowerCoordinate
         plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
@@ -154,7 +156,7 @@ def main():
 
         if verboseMultiHorizon:
             # plt.figure()
-            plt.scatter(imageData[:, 0], imageData[:, 1], marker='.', label='Horizon' + str(iteration), alpha=0.5)
+            plt.scatter(imageData[:, 0], imageData[:, 1], marker='.', label='Horizon ' + str(iteration + 1), alpha=0.5)
             # plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 10000, data_comp[0, 1] / 10000, width=0.000003)
             # plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 10000, data_comp[1, 1] / 10000, width=0.000003)
         
@@ -193,6 +195,9 @@ def main():
             print(' ')
             print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
 
+            # # @TODO: 
+            # break
+
 
         centers = []
         for i, component in enumerate(data_comp):
@@ -209,32 +214,52 @@ def main():
         xx = np.array([[torch.min(imageData[:, i]).numpy() - eps,
                         torch.max(imageData[:, i]).numpy() + eps] for i in range(1, len(imageData[0]))])
 
+            # if verboseMultiHorizon:
+            #     for i in range(len(data_comp)):
+            #         c = data_comp[i]
+            #         if c[0] != 0:
+            #             yy = (upperCoordinate[i] + centers[i] - c[1:] @ xx)/c[0]
+            #             plt.plot(yy, xx[0], '--',  c='grey')
+
+            #             yy = (lowerCoordinate[i] + centers[i] - c[1:] @ xx)/c[0]
+            #             plt.plot(yy, xx[0], '--', c='grey')
+            #         else:
+            #             raise
+
+
+
         if verboseMultiHorizon:
-            for i in range(len(data_comp)):
-                c = data_comp[i]
-                if c[0] != 0:
-                    yy = (upperCoordinate[i] + centers[i] - c[1:] @ xx)/c[0]
-                    plt.plot(yy, xx[0], '--',  c='grey')
+            A = -np.array(pcaDirections)
+            b = []
+            for i in range(dim):
+                b.append(upperCoordinate[i] + centers[i])
+                b.append(-lowerCoordinate[i] - centers[i])
 
-                    yy = (lowerCoordinate[i] + centers[i] - c[1:] @ xx)/c[0]
-                    plt.plot(yy, xx[0], '--', c='grey')
-                else:
-                    raise
-
+            b = np.array(b)
+            pltp = polytope.Polytope(A, b)
+            # print(pltp)
+            # plt.figure()
+            ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
+            ax.set_xlim([0, 5])
+            ax.set_ylim([-4, 5])
 
             plt.axis("equal")
-            plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
             plt.legend()
+            plt.title("Robotic Arm System")
+            plt.xlabel('x0')
+            plt.ylabel('x1')
 
-    if verboseMultiHorizon:
-        plt.show()
+            plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
+
+
 
         rotation = nn.Linear(dim, dim)
         rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
         rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
         network.rotation = rotation
 
-            
+    if verboseMultiHorizon:
+        plt.show()
 
 
     endTime = time.time()
