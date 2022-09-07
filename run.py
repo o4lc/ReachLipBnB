@@ -13,8 +13,10 @@ torch.set_printoptions(precision=8)
 def main():
 
     eps = .05
-    verbose = 0
-    scoreFunction = 'worstLowerBound'
+    verbose = 1
+    verboseMultiHorizon = 0
+    scoreFunction = 'length'
+
     virtualBranching = False
     numberOfVirtualBranches = 4
     maxSearchDepthLipschitzBound = 10
@@ -193,6 +195,10 @@ def main():
             print(' ')
             print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
 
+        rotation = nn.Linear(dim, dim)
+        rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
+        rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
+        network.rotation = rotation
 
         centers = []
         for i, component in enumerate(data_comp):
@@ -229,10 +235,7 @@ def main():
     if verboseMultiHorizon:
         plt.show()
 
-        rotation = nn.Linear(dim, dim)
-        rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
-        rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
-        network.rotation = rotation
+
 
             
 

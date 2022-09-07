@@ -59,14 +59,13 @@ class BranchAndBound:
                               "bestBound",
                               "branch", "branch:prune", "branch:maxFind", "branch:nodeCreation",
                               ])
+        self.numberOfBranches = 0
 
     def prune(self):
         # slightly faster since this starts deleting from the end of the list.
         for i in range(len(self.spaceNodes) - 1, -1, -1):
             if self.spaceNodes[i].lower > self.bestUpperBound:
                 self.spaceNodes.pop(i)
-                if self.verbose:
-                    print('deleted')
         # for node in self.spaceNodes:
         #     if node.lower >= self.bestUpperBound:
         #         self.spaceNodes.remove(node)
@@ -82,6 +81,7 @@ class BranchAndBound:
         return self.upperBoundClass.upperBound(indices, self.spaceNodes, self.queryCoefficient)
 
     def branch(self):
+
         # Prunning Function
         self.timers.start("branch:prune")
         self.prune()
@@ -149,6 +149,7 @@ class BranchAndBound:
         
         numNodesAfterBranch = len(self.spaceNodes)
         numNodesAdded = numNodesAfterBranch - numNodesAfterPrune + len(maxIndices)
+        self.numberOfBranches += numNodesAdded
 
         return [len(self.spaceNodes) - j for j in range(1, numNodesAdded + 1)], deletedUpperBounds, deletedLowerBounds
 
@@ -185,8 +186,9 @@ class BranchAndBound:
             plotter = Plotter()
 
         self.bound([0], self.bestUpperBound, self.bestLowerBound)
-        if self.scoreFunction == "worstLowerBound" or self.scoreFunction == "bestLowerBound":
-            self.spaceNodes[0].calc_score()
+        if self.scoreFunction in ["worstLowerBound", "bestLowerBound", "bestUpperBound", "worstUpperBound",
+                                  "averageBounds", "weightedGap"]:
+            self.spaceNodes[0].score = self.spaceNodes[0].calc_score()
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
             print(len(self.spaceNodes))
             # for i in range(len(self.spaceNodes)):
@@ -205,17 +207,14 @@ class BranchAndBound:
 
             self.bound(indices, deletedUb, deletedLb)
 
-            if self.scoreFunction == "worstLowerBound" or self.scoreFunction == "bestLowerBound":
+            if self.scoreFunction in ["worstLowerBound", "bestLowerBound", "bestUpperBound", "worstUpperBound",
+                                      "averageBounds", "weightedGap"]:
                 minimumIndex = len(self.spaceNodes) - self.branchNodeNum * self.nodeBranchingFactor
                 if minimumIndex < 0:
                     minimumIndex = 0
-                # minimumIndex = 0
                 maximumIndex = len(self.spaceNodes)
                 for i in range(minimumIndex, maximumIndex):
                     self.spaceNodes[i].score = self.spaceNodes[i].calc_score()
-
-                    # print(self.spaceNodes[i].lower)
-
 
             self.timers.start("bestBound")
 
@@ -228,12 +227,14 @@ class BranchAndBound:
             self.timers.pause("bestBound")
             #1.08618
             print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound, "diff", self.bestUpperBound - self.bestLowerBound)
+
             if self.verbose:
                 # print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound)
                 plotter.plotSpace(self.spaceNodes, self.initCoordLow, self.initCoordUp)
                 # print('--------------------')
-
+        print("Number of created nodes: {}".format(self.numberOfBranches))
         if self.verbose:
+
             plotter.showAnimation(self.spaceNodes)
         self.timers.pauseAll()
         self.timers.print()

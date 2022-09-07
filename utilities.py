@@ -33,16 +33,16 @@ class Plotter():
                                         edgecolor=None, facecolor="green", linewidth=7, alpha=0.3)
             self.ax.add_patch(rectangle)
             self.ax.vlines(x=node.coordLower[0], ymin=node.coordLower[1], 
-                                ymax=node.coordUpper[1], color='r', linestyle='--')
+                                ymax=node.coordUpper[1], color='r', linestyle='--', alpha=0.5)
             
             self.ax.vlines(x=node.coordUpper[0], ymin=node.coordLower[1], 
-                                ymax=node.coordUpper[1], color='r', linestyle='--')
+                                ymax=node.coordUpper[1], color='r', linestyle='--', alpha=0.5)
             
             self.ax.hlines(y=node.coordLower[1], xmin=node.coordLower[0], 
-                                xmax=node.coordUpper[0], color='r', linestyle='--')
+                                xmax=node.coordUpper[0], color='r', linestyle='--', alpha=0.5)
             
             self.ax.hlines(y=node.coordUpper[1], xmin=node.coordLower[0], 
-                                xmax=node.coordUpper[0], color='r', linestyle='--')
+                                xmax=node.coordUpper[0], color='r', linestyle='--', alpha=0.5)
         plt.xlim([lowCoord[0] - 0.2, upperCoord[0] + 0.2])
         plt.ylim([lowCoord[1] - 0.2, upperCoord[1] + 0.2])
         plt.title('ScoreFunction =' + space[0].scoreFunction)
