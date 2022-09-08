@@ -12,3 +12,5 @@ import matplotlib.animation as animation
 
 import os
 import time
+
+import polytope 
