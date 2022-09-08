@@ -23,7 +23,7 @@ c = dt * c;
 
 nx = size(A, 1); nu = size(B, 2);
 
-horizon = 20;
+horizon = 40;
 
 model = LTISystem('A', A, 'B', B, "f", c, "Ts", dt);
 
@@ -56,13 +56,16 @@ tic
 expmpc = mpc.toExplicit();
 toc
 fprintf("hello")
+fileName = sprintf("mpcQuadHorizon%d-%s.mat", horizon, string(datetime));
+save(fileName)
+%%
 
 % Generate data for neural xwnetwork training
 generate_trainData = 1;
 
 if(generate_trainData)
     
-    sampleResol = 5;
+    sampleResol = 20;
     
     % Vertices = [-12 -7; -12 7; 12 -7; 12 7];
     % dom = Polyhedron(Vertices);
