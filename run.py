@@ -12,9 +12,9 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = .05
+    eps = 0.001
     verbose = 0
-    verboseMultiHorizon = 0
+    verboseMultiHorizon = 1
     verboseEssential = 0
     scoreFunction = 'worstLowerBound'
     virtualBranching = False
@@ -24,7 +24,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 4
+    finalHorizon = 5
     initialGD = False
     performMultiStepSingleHorizon = False
 
@@ -46,7 +46,8 @@ def main():
     # fileName = "randomNetwork2.pth"
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
-    fileName = "doubleIntegrator.pth"
+    # fileName = "doubleIntegrator.pth"
+    fileName = "quadRotor.pth"
     # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
@@ -60,20 +61,25 @@ def main():
         B = torch.Tensor([[0.5], [1]])
         c = torch.Tensor([0])
     elif fileName == "quadRotor.pth":
+        dt = 0.1
         A = torch.Tensor([  [0., 0, 0, 1, 0, 0],
                             [0, 0, 0, 0, 1, 0],
                             [0, 0, 0, 0, 0, 1],
                             [0, 0, 0, 0, 0, 0],
                             [0, 0, 0, 0, 0, 0],
                             [0, 0, 0, 0, 0, 0]])
+
+        A = torch.eye(len(A)) + A * dt
         B = torch.Tensor([  [ 0. ,  0. ,  0. ],
                             [ 0. ,  0. ,  0. ],
                             [ 0. ,  0. ,  0. ],
                             [ 9.8,  0. ,  0. ],
                             [ 0. , -9.8,  0. ],
                             [ 0. ,  0. ,  1. ]])
+        B = B * dt
 
         c = torch.Tensor([0, 0, 0, 0, 0, -9.8])
+        c = c * dt
 
 
 
@@ -96,10 +102,10 @@ def main():
     # upperCoordinate = torch.Tensor([1., 1.]).to(device)
     # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
     # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
-    # lowerCoordinate = torch.Tensor([4.65, 4.65, 2.95, 0.94, -0.01, -0.01]).to(device)
-    # upperCoordinate = torch.Tensor([4.75, 4.75 ,3.05, 0.96,  0.01,  0.01 ]).to(device)
-    lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
-    upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+    lowerCoordinate = torch.Tensor([4.6975, 4.6975, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
+    upperCoordinate = torch.Tensor([4.7025, 4.7025 ,3.0025, 0.9501,  0.0001,  0.0001 ]).to(device)
+    # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
+    # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
 
     # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3]).to(device)
     # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
@@ -231,19 +237,20 @@ def main():
 
 
         if verboseMultiHorizon:
-            A = -np.array(pcaDirections)
-            b = []
-            for i in range(dim):
-                b.append(upperCoordinate[i] + centers[i])
-                b.append(-lowerCoordinate[i] - centers[i])
+            AA = -np.array(pcaDirections)
+            bb = []
+            for i in range(len(data_comp)):
+                bb.append(upperCoordinate[i] + centers[i])
+                bb.append(-lowerCoordinate[i] - centers[i])
 
-            b = np.array(b)
-            pltp = polytope.Polytope(A, b)
+            bb = np.array(bb)
+
+            pltp = polytope.Polytope(AA, bb)
             # print(pltp)
-            # plt.figure()
-            ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
-            ax.set_xlim([0, 5])
-            ax.set_ylim([-4, 5])
+            # # plt.figure()
+            # ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
+            # ax.set_xlim([0, 5])
+            # ax.set_ylim([-4, 5])
 
             plt.axis("equal")
             plt.legend()
