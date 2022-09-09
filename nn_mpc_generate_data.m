@@ -23,7 +23,7 @@ c = dt * c;
 
 nx = size(A, 1); nu = size(B, 2);
 
-horizon = 40;
+horizon = 45;
 
 model = LTISystem('A', A, 'B', B, "f", c, "Ts", dt);
 

@@ -24,9 +24,10 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 12
+    finalHorizon = 3
     initialGD = False
     performMultiStepSingleHorizon = False
+    plotProjectionsOfHigherDims = True
 
     if finalHorizon > 1 and performMultiStepSingleHorizon and\
             (normToUseLipschitz != 2 or not useSdpForLipschitzCalculation):
@@ -86,8 +87,10 @@ def main():
         c = torch.Tensor([0, 0, 0, 0, 0, -9.8])
         c = c * dt
 
-        lowerCoordinate = torch.Tensor([4.6975, 4.6975, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
-        upperCoordinate = torch.Tensor([4.7025, 4.7025 ,3.0025, 0.9501,  0.0001,  0.0001 ]).to(device)
+        # lowerCoordinate = torch.Tensor([4.6975, 4.6975, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
+        # upperCoordinate = torch.Tensor([4.7025, 4.7025 ,3.0025, 0.9501,  0.0001,  0.0001 ]).to(device)
+        lowerCoordinate = torch.Tensor([4.6, 4.6, 2.9, 0.93, -0.001, -0.001]).to(device)
+        upperCoordinate = torch.Tensor([4.8, 4.9, 3.1, 0.96, 0.001, 0.001]).to(device)
 
 
 
@@ -152,7 +155,7 @@ def main():
         with no_grad():
             imageData = network.forward(inputDataVariable)
 
-        
+
         pca = PCA()
         pcaData = pca.fit_transform(imageData)
 
@@ -169,10 +172,25 @@ def main():
             # plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 10000, data_comp[0, 1] / 10000, width=0.000003)
             # plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 10000, data_comp[1, 1] / 10000, width=0.000003)
         
+
         pcaDirections = []
         for direction in data_comp:
             pcaDirections.append(-direction)
             pcaDirections.append(direction)
+
+        numberOfInitialDirections = len(pcaDirections)
+        indexToStartReadingBoundsForPlotting = 0
+        plottingDirections = pcaDirections
+        if plotProjectionsOfHigherDims:
+            indexToStartReadingBoundsForPlotting = len(pcaDirections)
+            projectedImageData = imageData.clone()
+            projectedImageData[:, 2:] = 0
+            pca2 = PCA()
+            _ = pca2.fit_transform(projectedImageData)
+            plottingDirections = pca2.components_
+            for direction in plottingDirections[:2]:
+                pcaDirections.append(-direction)
+                pcaDirections.append(direction)
 
         pcaDirections = torch.Tensor(np.array(pcaDirections))
         calculatedLowerBoundsforpcaDirections = torch.Tensor(np.zeros(len(pcaDirections)))
@@ -239,20 +257,21 @@ def main():
 
 
         if verboseMultiHorizon:
-            AA = -np.array(pcaDirections)
+            AA = -np.array(pcaDirections[indexToStartReadingBoundsForPlotting:])
+            AA = AA[:, :2]
+            print(AA)
             bb = []
-            for i in range(len(data_comp)):
-                bb.append(upperCoordinate[i] + centers[i])
-                bb.append(-lowerCoordinate[i] - centers[i])
+            for i in range(indexToStartReadingBoundsForPlotting, len(calculatedLowerBoundsforpcaDirections)):
+                bb.append(-calculatedLowerBoundsforpcaDirections[i])
 
             bb = np.array(bb)
-            if dim == 2:
-                pltp = polytope.Polytope(AA, bb)
-                print(pltp)
-                # plt.figure()
-                ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
-                ax.set_xlim([0, 5])
-                ax.set_ylim([-4, 5])
+            # if dim == 2:
+            pltp = polytope.Polytope(AA, bb)
+            print(pltp)
+            # plt.figure()
+            ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
+            ax.set_xlim([0, 5])
+            ax.set_ylim([-4, 5])
 
             plt.axis("equal")
             plt.legend()
