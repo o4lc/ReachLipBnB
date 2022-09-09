@@ -24,7 +24,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 3
+    finalHorizon = 12
     initialGD = False
     performMultiStepSingleHorizon = False
 
@@ -46,9 +46,9 @@ def main():
     # fileName = "randomNetwork2.pth"
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
-    fileName = "doubleIntegrator.pth"
+    # fileName = "doubleIntegrator.pth"
     # fileName = "quadRotor5.pth"
-    # fileName = "quadRotorv2.0.pth"
+    fileName = "quadRotorv2.0.pth"
     # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
@@ -246,13 +246,13 @@ def main():
                 bb.append(-lowerCoordinate[i] - centers[i])
 
             bb = np.array(bb)
-
-            pltp = polytope.Polytope(AA, bb)
-            print(pltp)
-            # plt.figure()
-            ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
-            ax.set_xlim([0, 5])
-            ax.set_ylim([-4, 5])
+            if dim == 2:
+                pltp = polytope.Polytope(AA, bb)
+                print(pltp)
+                # plt.figure()
+                ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
+                ax.set_xlim([0, 5])
+                ax.set_ylim([-4, 5])
 
             plt.axis("equal")
             plt.legend()
