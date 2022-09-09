@@ -24,7 +24,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 5
+    finalHorizon = 12
     initialGD = False
     performMultiStepSingleHorizon = False
 
@@ -47,7 +47,8 @@ def main():
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
     # fileName = "doubleIntegrator.pth"
-    fileName = "quadRotor.pth"
+    # fileName = "quadRotor5.pth"
+    fileName = "quadRotorv2.0.pth"
     # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
@@ -60,7 +61,11 @@ def main():
         A = torch.Tensor([[1, 1], [0, 1]])
         B = torch.Tensor([[0.5], [1]])
         c = torch.Tensor([0])
-    elif fileName == "quadRotor.pth":
+
+        lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
+        upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+
+    elif fileName == "quadRotor.pth" or fileName == "quadRotorv2.0.pth":
         dt = 0.1
         A = torch.Tensor([  [0., 0, 0, 1, 0, 0],
                             [0, 0, 0, 0, 1, 0],
@@ -81,6 +86,9 @@ def main():
         c = torch.Tensor([0, 0, 0, 0, 0, -9.8])
         c = c * dt
 
+        lowerCoordinate = torch.Tensor([4.6975, 4.6975, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
+        upperCoordinate = torch.Tensor([4.7025, 4.7025 ,3.0025, 0.9501,  0.0001,  0.0001 ]).to(device)
+
 
 
     pathToStateDictionary = "Networks/" + fileName
@@ -100,12 +108,8 @@ def main():
     # The intial HyperRectangule
     # lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
     # upperCoordinate = torch.Tensor([1., 1.]).to(device)
-    # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
-    # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
-    lowerCoordinate = torch.Tensor([4.6975, 4.6975, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
-    upperCoordinate = torch.Tensor([4.7025, 4.7025 ,3.0025, 0.9501,  0.0001,  0.0001 ]).to(device)
-    # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
-    # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+
+
 
     # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3]).to(device)
     # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
@@ -131,11 +135,11 @@ def main():
     #         c[0] = 1.
     #         c[1] = -1
 
+    inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
+                                                        + lowerCoordinate
     if verboseMultiHorizon:
         # fig = plt.figure()
         fig, ax = plt.subplots()
-        inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
-            + lowerCoordinate
         plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
 
 
@@ -144,12 +148,9 @@ def main():
 
     for iteration in range(finalHorizon):
 
-        inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
-                + lowerCoordinate
-
-        inputData = Variable(inputData, requires_grad=False)
+        inputDataVariable = Variable(inputData, requires_grad=False)
         with no_grad():
-            imageData = network.forward(inputData)
+            imageData = network.forward(inputDataVariable)
 
         
         pca = PCA()
@@ -159,6 +160,7 @@ def main():
         data_comp = pca.components_
         data_sd = np.sqrt(pca.explained_variance_)
 
+        inputData = torch.from_numpy(data_comp @ (imageData.cpu().numpy() - data_mean).T).T.float()
         # print(np.linalg.norm(data_comp, 2, 1))
 
         if verboseMultiHorizon:
@@ -181,7 +183,7 @@ def main():
             if i % 2 == 1 and torch.allclose(pcaDirections[i], -pcaDirections[i - 1]):
                 previousLipschitzCalculations = BB.lowerBoundClass.calculatedLipschitzConstants
             c = pcaDirections[i]
-            print('** Solving with coefficient =', c)
+            print('** Solving Horizon: ', iteration, 'dimension: ', i)
 
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, verboseEssential=verboseEssential, inputDimension=dim,
                                 eps=eps, network=network, queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
@@ -244,13 +246,13 @@ def main():
                 bb.append(-lowerCoordinate[i] - centers[i])
 
             bb = np.array(bb)
-
-            pltp = polytope.Polytope(AA, bb)
-            # print(pltp)
-            # # plt.figure()
-            # ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
-            # ax.set_xlim([0, 5])
-            # ax.set_ylim([-4, 5])
+            if dim == 2:
+                pltp = polytope.Polytope(AA, bb)
+                print(pltp)
+                # plt.figure()
+                ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
+                ax.set_xlim([0, 5])
+                ax.set_ylim([-4, 5])
 
             plt.axis("equal")
             plt.legend()

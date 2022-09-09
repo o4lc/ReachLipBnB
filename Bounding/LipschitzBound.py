@@ -104,11 +104,15 @@ class LipschitzBounding:
                     beta = np.ones((num_neurons, 1))
                     if self.horizon == 1:
                         # lipschitzConstant = torch.Tensor([lipSDP(newWeights, alpha, beta, verbose=self.sdpSolverVerbose)]).to(self.device)
+                        # queryCoefficient = np.eye(6)
                         lipschitzConstant = torch.Tensor([lipSDP2(newWeights, alpha, beta,
                                                                   queryCoefficient.unsqueeze(0).cpu().numpy(),
+                                                                # queryCoefficient,
                                                                   self.network.A.cpu().numpy(),
                                                                   self.network.B.cpu().numpy(),
                                                                   verbose=self.sdpSolverVerbose)]).to(self.device)
+
+                        # lipschitzConstant /= 1
                     else:
                         l1 = torch.Tensor([lipSDP2(newWeights, alpha, beta,
                                                    queryCoefficient.unsqueeze(0).cpu().numpy(),
@@ -126,7 +130,7 @@ class LipschitzBounding:
                         self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
                         self.device)
                 lipschitzConstant *= normalizer ** len(newWeights)
-                # print(lipschitzConstant)
+                print(lipschitzConstant)
                 self.calculatedLipschitzConstants.append(lipschitzConstant)
                 self.pauseTime(timer, "lowerBound:lipschitzCalc")
             else:
