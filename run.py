@@ -28,6 +28,8 @@ def main():
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
+    if not verboseMultiHorizon:
+        plotProjectionsOfHigherDims = False
 
     if finalHorizon > 1 and performMultiStepSingleHorizon and\
             (normToUseLipschitz != 2 or not useSdpForLipschitzCalculation):
@@ -48,9 +50,9 @@ def main():
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
     # fileName = "doubleIntegrator.pth"
-    fileName = "doubleIntegrator_reachlp.pth"
+    # fileName = "doubleIntegrator_reachlp.pth"
     # fileName = "quadRotor5.pth"
-    # fileName = "quadRotorv2.0.pth"
+    fileName = "quadRotorv2.0.pth"
     # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
@@ -91,10 +93,10 @@ def main():
         c = torch.Tensor([0, 0, 0, 0, 0, -9.8])
         c = c * dt
 
-        # lowerCoordinate = torch.Tensor([4.6975, 4.6975, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
-        # upperCoordinate = torch.Tensor([4.7025, 4.7025 ,3.0025, 0.9501,  0.0001,  0.0001 ]).to(device)
-        lowerCoordinate = torch.Tensor([4.6, 4.6, 2.9, 0.93, -0.001, -0.001]).to(device)
-        upperCoordinate = torch.Tensor([4.8, 4.9, 3.1, 0.96, 0.001, 0.001]).to(device)
+        lowerCoordinate = torch.Tensor([4.6975, 4.6975, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
+        upperCoordinate = torch.Tensor([4.7025, 4.7025 ,3.0025, 0.9501,  0.0001,  0.0001 ]).to(device)
+        # lowerCoordinate = torch.Tensor([4.6, 4.6, 2.9, 0.93, -0.001, -0.001]).to(device)
+        # upperCoordinate = torch.Tensor([4.8, 4.9, 3.1, 0.96, 0.001, 0.001]).to(device)
 
 
 
@@ -116,7 +118,8 @@ def main():
     # lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
     # upperCoordinate = torch.Tensor([1., 1.]).to(device)
 
-
+    if dim < 3:
+        plotProjectionsOfHigherDims = False
 
     # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3]).to(device)
     # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
