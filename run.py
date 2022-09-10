@@ -12,7 +12,7 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = 0.001
+    eps = 0.01
     verbose = 0
     verboseMultiHorizon = 1
     verboseEssential = 0
@@ -24,7 +24,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 12
+    finalHorizon = 5
     initialGD = False
     performMultiStepSingleHorizon = False
 
@@ -47,8 +47,9 @@ def main():
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
     # fileName = "doubleIntegrator.pth"
+    fileName = "doubleIntegrator_reachlp.pth"
     # fileName = "quadRotor5.pth"
-    fileName = "quadRotorv2.0.pth"
+    # fileName = "quadRotorv2.0.pth"
     # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
@@ -57,13 +58,16 @@ def main():
     A = None
     B = None
     c = None
-    if fileName == "doubleIntegrator.pth":
+    if fileName == "doubleIntegrator.pth" or fileName == "doubleIntegrator_reachlp.pth":
         A = torch.Tensor([[1, 1], [0, 1]])
         B = torch.Tensor([[0.5], [1]])
         c = torch.Tensor([0])
 
-        lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
-        upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+        # lowerCoordinate = torch.Tensor([1., 1.5]).to(device)
+        # upperCoordinate = torch.Tensor([2., 2.5]).to(device)
+
+        lowerCoordinate = torch.Tensor([2.5, -0.25]).to(device)
+        upperCoordinate = torch.Tensor([3., 0.25]).to(device)
 
     elif fileName == "quadRotor.pth" or fileName == "quadRotorv2.0.pth":
         dt = 0.1
@@ -245,28 +249,68 @@ def main():
                 bb.append(upperCoordinate[i] + centers[i])
                 bb.append(-lowerCoordinate[i] - centers[i])
 
+
+
             bb = np.array(bb)
             if dim == 2:
                 pltp = polytope.Polytope(AA, bb)
-                print(pltp)
+                # print(pltp)
                 # plt.figure()
-                ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
+                ax = pltp.plot(ax, alpha = 1, color='None', edgecolor='red')
                 ax.set_xlim([0, 5])
                 ax.set_ylim([-4, 5])
 
             plt.axis("equal")
-            plt.legend()
-            plt.title("Robotic Arm System")
+            leg1 = plt.legend()
+            plt.title("Double Integrator")
             plt.xlabel('x0')
             plt.ylabel('x1')
 
-            plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
 
 
 
 
 
     if verboseMultiHorizon:
+        if fileName == "doubleIntegrator_reachlp.pth":
+            reachlp = np.array([
+                # [[2.5, 3], [-0.25, 0.25]],
+            [[ 1.90837383, 2.75 ],
+            [-1.125, -0.70422709]],
+
+            [[1.0081799, 1.8305043],
+            [-1.10589671, -0.80364925]],
+            
+            [[ 0.33328745,  0.94537741],
+            [-0.76938218, -0.41314635]],
+
+            [[-0.06750171, 0.46302059],
+            [-0.47266394, -0.07047667]],
+
+            [[-0.32873616,  0.38155359],
+            [-0.30535603,  0.09282264]]
+            ])
+            for i in range(len(reachlp)):
+                currHorizon = reachlp[i]
+                rectangle = patches.Rectangle((currHorizon[0][0], currHorizon[1][0]), 
+                                currHorizon[0][1] - currHorizon[0][0], 
+                                currHorizon[1][1] - currHorizon[1][0], 
+                                edgecolor='b', facecolor='none', linewidth=2, alpha=1)
+                x = ax.add_patch(rectangle)
+
+        # plt.hold(True)
+        custom_lines = [Line2D([0], [0], color='b', lw=2),
+                            Line2D([0], [0], color='red', lw=2, linestyle='--')]
+
+        # leg2 = plt.legend([custom_lines], ["s", 'ss'], loc=4)
+        plt.gca().add_artist(leg1)
+
+        ax.legend(custom_lines, ['ReachLP', 'ReachLipSDP'], loc=4)
+        plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
+
+
+        # plt.legend([x], ['a'])
+        # plt.legend()
         plt.show()
 
 
