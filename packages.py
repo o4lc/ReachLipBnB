@@ -9,6 +9,8 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 from matplotlib import pyplot as plt, patches
 import matplotlib.animation as animation
+from matplotlib.lines import Line2D
+
 
 import os
 import time
