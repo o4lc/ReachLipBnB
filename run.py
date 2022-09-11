@@ -28,6 +28,7 @@ def main():
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
+    minimalPCA = True
     if not verboseMultiHorizon:
         plotProjectionsOfHigherDims = False
 
@@ -102,6 +103,8 @@ def main():
         lowerCoordinate = torch.Tensor([np.pi/3., np.pi/3.]).to(device)
         upperCoordinate = torch.Tensor([2*np.pi/3., 2*np.pi/3.]).to(device)
 
+        minimalPCA = False
+
 
 
     pathToStateDictionary = "Networks/" + fileName
@@ -123,7 +126,6 @@ def main():
     if dim < 3:
         plotProjectionsOfHigherDims = False
 
-    print('a')
     # if "ACAS" in pathToStateDictionary or "mnist" in pathToStateDictionary:
     #     lowerCoordinate = torch.Tensor([-2. / 2560] * dim).to(device)
     #     upperCoordinate = torch.Tensor([2. / 2560] * dim).to(device)
@@ -163,27 +165,39 @@ def main():
         with no_grad():
             imageData = network.forward(inputDataVariable)
 
-        
-        pca = PCA()
-        pcaData = pca.fit_transform(imageData)
+        if minimalPCA:
+            pca = PCA()
+            pcaData = pca.fit_transform(imageData)
 
-        data_mean = pca.mean_
-        data_comp = pca.components_
-        data_sd = np.sqrt(pca.explained_variance_)
+            data_mean = pca.mean_
+            data_comp = pca.components_
+            data_sd = np.sqrt(pca.explained_variance_)
 
-        inputData = torch.from_numpy(data_comp @ (imageData.cpu().numpy() - data_mean).T).T.float()
-        # print(np.linalg.norm(data_comp, 2, 1))
+            inputData = torch.from_numpy(data_comp @ (imageData.cpu().numpy() - data_mean).T).T.float()
+            # print(np.linalg.norm(data_comp, 2, 1))
+
+
+            
+            pcaDirections = []
+            for direction in data_comp:
+                pcaDirections.append(-direction)
+                pcaDirections.append(direction)
+
+        else:
+            pcaDirections = []
+            numDirections = 30
+
+            data_comp = np.array([[np.cos(i * np.pi / numDirections), np.sin(i * np.pi / numDirections)] for i in range(numDirections)])
+            for direction in data_comp:
+                pcaDirections.append(-direction)
+                pcaDirections.append(direction)
+
 
         if verboseMultiHorizon:
             # plt.figure()
             plt.scatter(imageData[:, 0], imageData[:, 1], marker='.', label='Horizon ' + str(iteration + 1), alpha=0.5)
             # plt.arrow(data_mean[0], data_mean[1], data_comp[0, 0] / 10000, data_comp[0, 1] / 10000, width=0.000003)
             # plt.arrow(data_mean[0], data_mean[1], data_comp[1, 0] / 10000, data_comp[1, 1] / 10000, width=0.000003)
-        
-        pcaDirections = []
-        for direction in data_comp:
-            pcaDirections.append(-direction)
-            pcaDirections.append(direction)
 
         numberOfInitialDirections = len(pcaDirections)
         indexToStartReadingBoundsForPlotting = 0
@@ -229,37 +243,21 @@ def main():
             print(' ')
             print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
 
-        rotation = nn.Linear(dim, dim)
-        rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
-        rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
-        network.rotation = rotation
+        if finalHorizon > 1:
+            rotation = nn.Linear(dim, dim)
+            rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
+            rotation.bias = torch.nn.parameter.Parameter(torch.from_numpy(data_mean).float().to(device))
+            network.rotation = rotation
 
-        centers = []
-        for i, component in enumerate(data_comp):
-            u = -calculatedLowerBoundsforpcaDirections[2 * i]
-            l = calculatedLowerBoundsforpcaDirections[2 * i + 1]
-            # center = (u + l) / 2
-            center = component @ data_mean
-            centers.append(center)
-            upperCoordinate[i] = u - center
-            lowerCoordinate[i] = l - center
-
-
-
-        xx = np.array([[torch.min(imageData[:, i]).numpy() - eps,
-                        torch.max(imageData[:, i]).numpy() + eps] for i in range(1, len(imageData[0]))])
-
-            # if verboseMultiHorizon:
-            #     for i in range(len(data_comp)):
-            #         c = data_comp[i]
-            #         if c[0] != 0:
-            #             yy = (upperCoordinate[i] + centers[i] - c[1:] @ xx)/c[0]
-            #             plt.plot(yy, xx[0], '--',  c='grey')
-
-            #             yy = (lowerCoordinate[i] + centers[i] - c[1:] @ xx)/c[0]
-            #             plt.plot(yy, xx[0], '--', c='grey')
-            #         else:
-            #             raise
+            centers = []
+            for i, component in enumerate(data_comp):
+                u = -calculatedLowerBoundsforpcaDirections[2 * i]
+                l = calculatedLowerBoundsforpcaDirections[2 * i + 1]
+                # center = (u + l) / 2
+                center = component @ data_mean
+                centers.append(center)
+                upperCoordinate[i] = u - center
+                lowerCoordinate[i] = l - center
 
 
 
@@ -325,10 +323,6 @@ def main():
 
         plt.gca().add_artist(leg1)
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
-
-
-        # plt.legend([x], ['a'])
-        # plt.legend()
         plt.show()
 
 
