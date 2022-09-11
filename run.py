@@ -24,7 +24,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 5
+    finalHorizon = 1
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
@@ -52,8 +52,8 @@ def main():
     # fileName = "doubleIntegrator.pth"
     # fileName = "doubleIntegrator_reachlp.pth"
     # fileName = "quadRotor5.pth"
-    fileName = "quadRotorv2.0.pth"
-    # fileName = "RobotArmStateDict2-50-2.pth"
+    # fileName = "quadRotorv2.0.pth"
+    fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
@@ -98,6 +98,10 @@ def main():
         # lowerCoordinate = torch.Tensor([4.6, 4.6, 2.9, 0.93, -0.001, -0.001]).to(device)
         # upperCoordinate = torch.Tensor([4.8, 4.9, 3.1, 0.96, 0.001, 0.001]).to(device)
 
+    elif fileName == "RobotArmStateDict2-50-2.pth":
+        lowerCoordinate = torch.Tensor([np.pi/3., np.pi/3.]).to(device)
+        upperCoordinate = torch.Tensor([2*np.pi/3., 2*np.pi/3.]).to(device)
+
 
 
     pathToStateDictionary = "Networks/" + fileName
@@ -114,15 +118,12 @@ def main():
     dim = network.Linear[0].weight.shape[1]
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
-    # The intial HyperRectangule
-    # lowerCoordinate = torch.Tensor([-1., -1.]).to(device)
-    # upperCoordinate = torch.Tensor([1., 1.]).to(device)
+
 
     if dim < 3:
         plotProjectionsOfHigherDims = False
 
-    # lowerCoordinate = torch.Tensor([torch.pi / 3, torch.pi / 3]).to(device)
-    # upperCoordinate = torch.Tensor([2 * torch.pi / 3, 2 * torch.pi / 3]).to(device)
+    print('a')
     # if "ACAS" in pathToStateDictionary or "mnist" in pathToStateDictionary:
     #     lowerCoordinate = torch.Tensor([-2. / 2560] * dim).to(device)
     #     upperCoordinate = torch.Tensor([2. / 2560] * dim).to(device)
@@ -317,14 +318,12 @@ def main():
                                 edgecolor='b', facecolor='none', linewidth=2, alpha=1)
                 x = ax.add_patch(rectangle)
 
-        # plt.hold(True)
-        custom_lines = [Line2D([0], [0], color='b', lw=2),
-                            Line2D([0], [0], color='red', lw=2, linestyle='--')]
+            custom_lines = [Line2D([0], [0], color='b', lw=2),
+                                Line2D([0], [0], color='red', lw=2, linestyle='--')]
+            ax.legend(custom_lines, ['ReachLP', 'ReachLipSDP'], loc=4)
+            
 
-        # leg2 = plt.legend([custom_lines], ["s", 'ss'], loc=4)
         plt.gca().add_artist(leg1)
-
-        ax.legend(custom_lines, ['ReachLP', 'ReachLipSDP'], loc=4)
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
 
 
