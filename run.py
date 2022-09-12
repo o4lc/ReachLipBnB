@@ -25,7 +25,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 1
+    finalHorizon = 5
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
@@ -53,10 +53,10 @@ def main():
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
     # fileName = "doubleIntegrator.pth"
-    # fileName = "doubleIntegrator_reachlp.pth"
+    fileName = "doubleIntegrator_reachlp.pth"
     # fileName = "quadRotor5.pth"
     # fileName = "quadRotorv2.0.pth"
-    fileName = "RobotArmStateDict2-50-2.pth"
+    # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
@@ -128,9 +128,10 @@ def main():
     outputDim = network.Linear[-1].weight.shape[0]
     network.to(device)
 
-
     if dim < 3:
         plotProjectionsOfHigherDims = False
+
+    plottingData = {}
 
     inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
                                                         + lowerCoordinate
@@ -138,7 +139,7 @@ def main():
         # fig = plt.figure()
         fig, ax = plt.subplots()
         plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
-
+    plottingData[0] = {"exactSet": inputData}
 
 
     startTime = time.time()
@@ -148,7 +149,7 @@ def main():
         inputDataVariable = Variable(inputData, requires_grad=False)
         with no_grad():
             imageData = network.forward(inputDataVariable)
-
+        plottingData[iteration + 1] = {"exactSet": imageData}
         if minimalPCA:
             pca = PCA()
             pcaData = pca.fit_transform(imageData)
@@ -176,7 +177,9 @@ def main():
                 pcaDirections.append(-direction)
                 pcaDirections.append(direction)
 
-
+        plottingData[iteration + 1]["A"] = pcaDirections
+        plottingConstants = np.zeros((len(pcaDirections), 1))
+        plottingData[iteration + 1]['d'] = plottingConstants
         if verboseMultiHorizon:
             # plt.figure()
             plt.scatter(imageData[:, 0], imageData[:, 1], marker='.', label='Horizon ' + str(iteration + 1), alpha=0.5)
@@ -199,7 +202,6 @@ def main():
 
         pcaDirections = torch.Tensor(np.array(pcaDirections))
         calculatedLowerBoundsforpcaDirections = torch.Tensor(np.zeros(len(pcaDirections)))
-        
 
         for i in range(len(pcaDirections)):
             previousLipschitzCalculations = []
@@ -207,7 +209,7 @@ def main():
                 previousLipschitzCalculations = BB.lowerBoundClass.calculatedLipschitzConstants
             c = pcaDirections[i]
             print('** Solving Horizon: ', iteration, 'dimension: ', i)
-
+            initialBub = torch.min(imageData @ c)
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, verboseEssential=verboseEssential, inputDimension=dim,
                                 eps=eps, network=network, queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
                                 scoreFunction=scoreFunction,
@@ -220,9 +222,11 @@ def main():
                                 initialGD=initialGD,
                                 previousLipschitzCalculations=previousLipschitzCalculations,
                                 originalNetwork=originalNetwork,
-                                horizonForLipschitz=horizonForLipschitz
+                                horizonForLipschitz=horizonForLipschitz,
+                                initialBub=initialBub
                                 )
             lowerBound, upperBound, space_left = BB.run()
+            plottingConstants[i] = -lowerBound
             calculatedLowerBoundsforpcaDirections[i] = lowerBound
             print(' ')
             print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
@@ -242,8 +246,6 @@ def main():
                 centers.append(center)
                 upperCoordinate[i] = u - center
                 lowerCoordinate[i] = l - center
-
-
 
         if verboseMultiHorizon:
             AA = -np.array(pcaDirections[indexToStartReadingBoundsForPlotting:])
@@ -268,13 +270,9 @@ def main():
             plt.xlabel('x0')
             plt.ylabel('x1')
 
-
-
-
-
-
     if verboseMultiHorizon:
         if fileName == "doubleIntegrator_reachlp.pth":
+
             reachlp = np.array([
                 # [[2.5, 3], [-0.25, 0.25]],
             [[ 1.90837383, 2.75 ],
@@ -292,6 +290,7 @@ def main():
             [[-0.32873616,  0.38155359],
             [-0.30535603,  0.09282264]]
             ])
+            plottingData["reachlp"] = reachlp
             for i in range(len(reachlp)):
                 currHorizon = reachlp[i]
                 rectangle = patches.Rectangle((currHorizon[0][0], currHorizon[1][0]),
@@ -311,8 +310,10 @@ def main():
 
 
     endTime = time.time()
-    
+
     print('The algorithm took (s):', endTime - startTime, 'with eps =', eps)
+
+    torch.save(plottingData, "Output/reachLip" + fileName)
 
 
 def repeatNetwork(network, horizon):

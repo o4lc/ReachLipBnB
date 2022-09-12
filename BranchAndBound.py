@@ -21,11 +21,12 @@ class BranchAndBound:
                  normToUseLipschitz=2, useTwoNormDilation=False, useSdpForLipschitzCalculation=False,
                  lipschitzSdpSolverVerbose=False, initialGD=False, previousLipschitzCalculations=[],
                  originalNetwork=None,
-                 horizonForLipschitz=1
+                 horizonForLipschitz=1,
+                 initialBub=None,
                  ):
 
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
-        self.bestUpperBound = None
+        self.bestUpperBound = initialBub
         self.bestLowerBound = None
         self.initCoordUp = coordUp
         self.initCoordLow = coordLow
@@ -177,10 +178,14 @@ class BranchAndBound:
                                              self.inputDimension, self.device, self.maximumBatchSize)
 
 
-            self.bestUpperBound = torch.Tensor(initUpperBoundClass.upperBound([0], self.spaceNodes, self.queryCoefficient))
+            if self.bestUpperBound:
+                self.bestUpperBound =\
+                    torch.minimum(self.bestUpperBound,
+                                  torch.Tensor(initUpperBoundClass.upperBound([0], self.spaceNodes,
+                                                                              self.queryCoefficient)))
             if self.verboseEssential:
                 print(self.bestUpperBound)
-        else:
+        elif self.bestUpperBound is None:
             self.bestUpperBound = torch.Tensor([torch.inf]).to(self.device)
         self.bestLowerBound = torch.Tensor([-torch.inf]).to(self.device)
 
