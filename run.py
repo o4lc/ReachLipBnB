@@ -26,7 +26,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 1
+    finalHorizon = 3
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
@@ -55,16 +55,19 @@ def main():
     # fileName = "doubleIntegrator.pth"
     # fileName = "doubleIntegrator_reachlp.pth"
     # fileName = "quadRotor5.pth"
-    # fileName = "quadRotorv2.0.pth"
-    fileName = "RobotArmStateDict2-50-2.pth"
+    fileName = "quadRotorv2.0.pth"
+    # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
+    # fileName = "quadRotorFullLoopV1.1.pth"
+    # fileName = "quadRotorNormalV1.1.pth"
 
     A = None
     B = None
     c = None
-    if fileName == "doubleIntegrator.pth" or fileName == "doubleIntegrator_reachlp.pth":
+
+    if "doubleIntegrator" in fileName:
         A = torch.Tensor([[1, 1], [0, 1]])
         B = torch.Tensor([[0.5], [1]])
         c = torch.Tensor([0])
@@ -75,7 +78,7 @@ def main():
         lowerCoordinate = torch.Tensor([2.5, -0.25]).to(device)
         upperCoordinate = torch.Tensor([3., 0.25]).to(device)
 
-    elif fileName == "quadRotor.pth" or fileName == "quadRotorv2.0.pth":
+    elif "quadRotor" in fileName:
         dt = 0.1
         A = torch.Tensor([  [0., 0, 0, 1, 0, 0],
                             [0, 0, 0, 0, 1, 0],
@@ -96,8 +99,8 @@ def main():
         c = torch.Tensor([0, 0, 0, 0, 0, -9.8])
         c = c * dt
 
-        lowerCoordinate = torch.Tensor([4.6975, 4.6975, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
-        upperCoordinate = torch.Tensor([4.7025, 4.7025 ,3.0025, 0.9501,  0.0001,  0.0001 ]).to(device)
+        lowerCoordinate = torch.Tensor([4.69, 4.69, 2.9, 0.94, -0.001, -0.001]).to(device)
+        upperCoordinate = torch.Tensor([4.71, 4.71 ,3.1, 0.95,  0.001,  0.001 ]).to(device)
         # lowerCoordinate = torch.Tensor([4.6, 4.6, 2.9, 0.93, -0.001, -0.001]).to(device)
         # upperCoordinate = torch.Tensor([4.8, 4.9, 3.1, 0.96, 0.001, 0.001]).to(device)
 
@@ -106,8 +109,11 @@ def main():
         upperCoordinate = torch.Tensor([2*np.pi/3., 2*np.pi/3.]).to(device)
 
         minimalPCA = False
-
-
+    if "FullLoop" in fileName:
+        print("full loop network")
+        A = None
+        B = None
+        c = None
 
     pathToStateDictionary = "Networks/" + fileName
 
@@ -115,6 +121,9 @@ def main():
     upperCoordinate = upperCoordinate.to(device)
 
     network = NeuralNetwork(pathToStateDictionary, A, B, c)
+    print(network.A)
+    print(network.B)
+    print(network.c)
     horizonForLipschitz = 1
     originalNetwork = None
     if performMultiStepSingleHorizon:
@@ -178,9 +187,7 @@ def main():
                 pcaDirections.append(-direction)
                 pcaDirections.append(direction)
 
-        plottingData[iteration + 1]["A"] = pcaDirections
-        plottingConstants = np.zeros((len(pcaDirections), 1))
-        plottingData[iteration + 1]['d'] = plottingConstants
+
         if verboseMultiHorizon:
             # plt.figure()
             plt.scatter(imageData[:, 0], imageData[:, 1], marker='.', label='Horizon ' + str(iteration + 1), alpha=0.5)
@@ -201,6 +208,9 @@ def main():
                 pcaDirections.append(-direction)
                 pcaDirections.append(direction)
 
+        plottingData[iteration + 1]["A"] = pcaDirections
+        plottingConstants = np.zeros((len(pcaDirections), 1))
+        plottingData[iteration + 1]['d'] = plottingConstants
         pcaDirections = torch.Tensor(np.array(pcaDirections))
         calculatedLowerBoundsforpcaDirections = torch.Tensor(np.zeros(len(pcaDirections)))
 
@@ -209,7 +219,7 @@ def main():
             if i % 2 == 1 and torch.allclose(pcaDirections[i], -pcaDirections[i - 1]):
                 previousLipschitzCalculations = BB.lowerBoundClass.calculatedLipschitzConstants
             c = pcaDirections[i]
-            if False:
+            if True:
                 print('** Solving Horizon: ', iteration, 'dimension: ', i)
             initialBub = torch.min(imageData @ c)
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, verboseEssential=verboseEssential, inputDimension=dim,
@@ -230,7 +240,7 @@ def main():
             lowerBound, upperBound, space_left = BB.run()
             plottingConstants[i] = -lowerBound
             calculatedLowerBoundsforpcaDirections[i] = lowerBound
-            if False:
+            if True:
                 print(' ')
                 print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
 
@@ -317,49 +327,6 @@ def main():
     print('The algorithm took (s):', endTime - startTime, 'with eps =', eps)
 
     torch.save(plottingData, "Output/reachLip" + fileName)
-
-
-def repeatNetwork(network, horizon):
-    # originalNetworkLength = len(network.Linear)
-    # for j in range(horizon - 1):
-    #     for i in range(originalNetworkLength):
-    #         if type(network.Linear[i]) == nn.modules.activation.ReLU:
-    #             network.Linear.append(nn.ReLU())
-    #         else:
-    #             s1, s0 = network.Linear[i].weight.shape
-    #             network.Linear.append(nn.Linear(s0, s1))
-    #             network.Linear[-1].weight = nn.Parameter(network.Linear[i].weight.detach().clone())
-    #             network.Linear[-1].bias = nn.Parameter(network.Linear[i].bias.detach().clone())
-    numberOfRepeats = horizon - 1
-    originalNetworkLength = len(network.Linear)
-
-    w0 = network.Linear[0].weight.detach().clone()
-    wLast = network.Linear[originalNetworkLength - 1].weight.detach().clone()
-    b0 = network.Linear[0].bias.detach().clone()
-    bLast = network.Linear[originalNetworkLength - 1].bias.detach().clone().unsqueeze(1)
-    weight = w0 @ wLast
-    bias = (w0 @ bLast).squeeze() + b0
-
-    for j in range(numberOfRepeats):
-        for i in range(originalNetworkLength):
-            if type(network.Linear[i]) == nn.modules.activation.ReLU:
-                network.Linear.append(nn.ReLU())
-            else:
-                if i == 0:
-
-                    network.Linear[-1] = nn.Linear(weight.shape[1], weight.shape[0])
-                    network.Linear[-1].weight = nn.Parameter(weight)
-                    network.Linear[-1].bias = nn.Parameter(bias)
-
-                elif i < originalNetworkLength - 1 or j < numberOfRepeats - 1:
-                    s1, s0 = network.Linear[i].weight.shape
-                    network.Linear.append(nn.Linear(s0, s1))
-                    network.Linear[-1].weight = nn.Parameter(network.Linear[i].weight.detach().clone())
-                    network.Linear[-1].bias = nn.Parameter(network.Linear[i].bias.detach().clone())
-
-    network.Linear.append(nn.Linear(wLast.shape[1], wLast.shape[0]))
-    network.Linear[-1].weight = nn.Parameter(wLast)
-    network.Linear[-1].bias = nn.Parameter(bLast.squeeze())
 
 
 if __name__ == '__main__':
