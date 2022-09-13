@@ -1,5 +1,3 @@
-# from tabnanny import verbose
-
 import torch
 
 from packages import *
@@ -244,7 +242,8 @@ class BranchAndBound:
                 # print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound)
                 plotter.plotSpace(self.spaceNodes, self.initCoordLow, self.initCoordUp)
                 # print('--------------------')
-        print("Number of created nodes: {}".format(self.numberOfBranches))
+        if False:
+            print("Number of created nodes: {}".format(self.numberOfBranches))
         if self.verbose:
 
             plotter.showAnimation(self.spaceNodes, self.currDim)
