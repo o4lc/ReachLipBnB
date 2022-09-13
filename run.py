@@ -1,3 +1,4 @@
+from tabnanny import verbose
 import torch
 
 from packages import *
@@ -126,36 +127,13 @@ def main():
     if dim < 3:
         plotProjectionsOfHigherDims = False
 
-    # if "ACAS" in pathToStateDictionary or "mnist" in pathToStateDictionary:
-    #     lowerCoordinate = torch.Tensor([-2. / 2560] * dim).to(device)
-    #     upperCoordinate = torch.Tensor([2. / 2560] * dim).to(device)
-    #     # lowerCoordinate = torch.Tensor([-1.] * dim).to(device)
-    #     # upperCoordinate = torch.Tensor([1.] * dim).to(device)
-    #     # c = torch.ones(outputDim).to(device)
-    #     c = torch.zeros(outputDim, dtype=torch.float).to(device)
-    #     if "mnist" in pathToStateDictionary:
-    #         df = pd.read_csv("mnistTestData.csv")
-    #         testImage = torch.Tensor(df.loc[0].to_numpy()[1:] / 255.).to(device)
-    #         lowerCoordinate += testImage
-    #         upperCoordinate += testImage
-    #         testLabel = df.loc[0].label
-    #         c[testLabel] = 1.
-    #         try:
-    #             c[testLabel + 1] = -1
-    #         except:
-    #             c[testLabel - 1] = -1
-    #     else:
-    #         c[0] = 1.
-    #         c[1] = -1
-
     inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
                                                         + lowerCoordinate
     if verboseMultiHorizon:
         # fig = plt.figure()
         fig, ax = plt.subplots()
-        plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
-
-
+        if fileName != "RobotArmStateDict2-50-2.pth":
+            plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
 
     startTime = time.time()
 
@@ -225,7 +203,7 @@ def main():
             print('** Solving Horizon: ', iteration, 'dimension: ', i)
 
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, verboseEssential=verboseEssential, inputDimension=dim,
-                                eps=eps, network=network, queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
+                                eps=eps, network=network, queryCoefficient=c, currDim=i,  device=device, nodeBranchingFactor=2, branchNodeNum=512,
                                 scoreFunction=scoreFunction,
                                 pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5, virtualBranching=virtualBranching,
                                 numberOfVirtualBranches=numberOfVirtualBranches,
@@ -279,10 +257,10 @@ def main():
             ax.set_ylim([-4, 5])
 
             plt.axis("equal")
-            leg1 = plt.legend()
-            plt.title("Double Integrator")
-            plt.xlabel('x0')
-            plt.ylabel('x1')
+            # leg1 = plt.legend()
+            plt.title("Robot Arm")
+            plt.xlabel('$x_0$')
+            plt.ylabel('$x_1$')
 
 
 
@@ -321,7 +299,7 @@ def main():
             ax.legend(custom_lines, ['ReachLP', 'ReachLipSDP'], loc=4)
             
 
-        plt.gca().add_artist(leg1)
+        # plt.gca().add_artist(leg1)
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
         plt.show()
 

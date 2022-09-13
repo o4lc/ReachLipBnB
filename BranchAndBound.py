@@ -12,7 +12,7 @@ from Utilities.Timer import Timers
 
 class BranchAndBound:
     def __init__(self, coordUp=None, coordLow=None, verbose=False, verboseEssential=False, pgdStepSize=1e-3,
-                 inputDimension=2, eps=0.1, network=None, queryCoefficient=None,
+                 inputDimension=2, eps=0.1, network=None, queryCoefficient=None, currDim = 0,
                  pgdIterNum=5, pgdNumberOfInitializations=2, device=torch.device("cuda", 0),
                  maximumBatchSize=256,  nodeBranchingFactor=2, branchNodeNum = 1,
                  scoreFunction='length',
@@ -36,6 +36,7 @@ class BranchAndBound:
         self.inputDimension = inputDimension
         self.eps = eps
         self.network = network
+        self.currDim = currDim
         self.queryCoefficient = queryCoefficient
         self.lowerBoundClass = LipschitzBounding(network, device, virtualBranching, maxSearchDepthLipschitzBound,
                                                  normToUseLipschitz, useTwoNormDilation, useSdpForLipschitzCalculation,
@@ -241,7 +242,7 @@ class BranchAndBound:
         print("Number of created nodes: {}".format(self.numberOfBranches))
         if self.verbose:
 
-            plotter.showAnimation(self.spaceNodes)
+            plotter.showAnimation(self.spaceNodes, self.currDim)
         self.timers.pauseAll()
         if self.verboseEssential:
             self.timers.print()
