@@ -1,3 +1,4 @@
+from tabnanny import verbose
 import torch
 
 from packages import *
@@ -25,12 +26,11 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 5
+    finalHorizon = 1
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
     minimalPCA = True
-
     if not verboseMultiHorizon:
         plotProjectionsOfHigherDims = False
 
@@ -53,10 +53,10 @@ def main():
     # fileName = "randomNetwork3.pth"
     # fileName = "trainedNetwork1.pth"
     # fileName = "doubleIntegrator.pth"
-    fileName = "doubleIntegrator_reachlp.pth"
+    # fileName = "doubleIntegrator_reachlp.pth"
     # fileName = "quadRotor5.pth"
     # fileName = "quadRotorv2.0.pth"
-    # fileName = "RobotArmStateDict2-50-2.pth"
+    fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
@@ -138,7 +138,8 @@ def main():
     if verboseMultiHorizon:
         # fig = plt.figure()
         fig, ax = plt.subplots()
-        plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
+        if fileName != "RobotArmStateDict2-50-2.pth":
+            plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
     plottingData[0] = {"exactSet": inputData}
 
 
@@ -208,10 +209,11 @@ def main():
             if i % 2 == 1 and torch.allclose(pcaDirections[i], -pcaDirections[i - 1]):
                 previousLipschitzCalculations = BB.lowerBoundClass.calculatedLipschitzConstants
             c = pcaDirections[i]
-            print('** Solving Horizon: ', iteration, 'dimension: ', i)
+            if False:
+                print('** Solving Horizon: ', iteration, 'dimension: ', i)
             initialBub = torch.min(imageData @ c)
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, verboseEssential=verboseEssential, inputDimension=dim,
-                                eps=eps, network=network, queryCoefficient=c, device=device, nodeBranchingFactor=2, branchNodeNum=512,
+                                eps=eps, network=network, queryCoefficient=c, currDim=i,  device=device, nodeBranchingFactor=2, branchNodeNum=512,
                                 scoreFunction=scoreFunction,
                                 pgdIterNum=0, pgdNumberOfInitializations=2, pgdStepSize=0.5, virtualBranching=virtualBranching,
                                 numberOfVirtualBranches=numberOfVirtualBranches,
@@ -228,8 +230,9 @@ def main():
             lowerBound, upperBound, space_left = BB.run()
             plottingConstants[i] = -lowerBound
             calculatedLowerBoundsforpcaDirections[i] = lowerBound
-            print(' ')
-            print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
+            if False:
+                print(' ')
+                print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
 
         if finalHorizon > 1:
             rotation = nn.Linear(dim, dim)
@@ -250,7 +253,6 @@ def main():
         if verboseMultiHorizon:
             AA = -np.array(pcaDirections[indexToStartReadingBoundsForPlotting:])
             AA = AA[:, :2]
-            print(AA)
             bb = []
             for i in range(indexToStartReadingBoundsForPlotting, len(calculatedLowerBoundsforpcaDirections)):
                 bb.append(-calculatedLowerBoundsforpcaDirections[i])
@@ -258,17 +260,18 @@ def main():
             bb = np.array(bb)
             # if dim == 2:
             pltp = polytope.Polytope(AA, bb)
-            print(pltp)
+            # print(pltp)
             # plt.figure()
             ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
             ax.set_xlim([0, 5])
             ax.set_ylim([-4, 5])
 
             plt.axis("equal")
-            leg1 = plt.legend()
-            plt.title("Double Integrator")
-            plt.xlabel('x0')
-            plt.ylabel('x1')
+            if fileName != "RobotArmStateDict2-50-2.pth":
+                leg1 = plt.legend()
+            plt.title("Robot Arm")
+            plt.xlabel('$x_0$')
+            plt.ylabel('$x_1$')
 
     if verboseMultiHorizon:
         if fileName == "doubleIntegrator_reachlp.pth":
@@ -304,9 +307,9 @@ def main():
             ax.legend(custom_lines, ['ReachLP', 'ReachLipSDP'], loc=4)
             
 
-        plt.gca().add_artist(leg1)
+        # plt.gca().add_artist(leg1)
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
-        plt.show()
+        # plt.show()
 
 
     endTime = time.time()
