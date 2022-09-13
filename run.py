@@ -26,7 +26,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 1
+    finalHorizon = 3
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
@@ -55,12 +55,12 @@ def main():
     # fileName = "doubleIntegrator.pth"
     # fileName = "doubleIntegrator_reachlp.pth"
     # fileName = "quadRotor5.pth"
-    # fileName = "quadRotorv2.0.pth"
+    fileName = "quadRotorv2.0.pth"
     # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
-    fileName = "quadRotorFullLoopV1.5.pth"
+    # fileName = "quadRotorFullLoopV1.1.pth"
     # fileName = "quadRotorNormalV1.1.pth"
 
     A = None
