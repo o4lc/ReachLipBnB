@@ -26,7 +26,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 5
+    finalHorizon = 1
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
@@ -56,11 +56,12 @@ def main():
     # fileName = "doubleIntegrator_reachlp.pth"
     # fileName = "quadRotor5.pth"
     # fileName = "quadRotorv2.0.pth"
-    fileName = "RobotArmStateDict2-50-2.pth"
+    # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
-    fileName = "quadRotorFullLoopV1.0.pth"
+    fileName = "quadRotorFullLoopV1.5.pth"
+    # fileName = "quadRotorNormalV1.1.pth"
 
     A = None
     B = None
@@ -109,8 +110,10 @@ def main():
 
         minimalPCA = False
     if "FullLoop" in fileName:
-        A = B = c = None
-
+        print("full loop network")
+        A = None
+        B = None
+        c = None
 
     pathToStateDictionary = "Networks/" + fileName
 
@@ -118,6 +121,9 @@ def main():
     upperCoordinate = upperCoordinate.to(device)
 
     network = NeuralNetwork(pathToStateDictionary, A, B, c)
+    print(network.A)
+    print(network.B)
+    print(network.c)
     horizonForLipschitz = 1
     originalNetwork = None
     if performMultiStepSingleHorizon:
@@ -213,7 +219,7 @@ def main():
             if i % 2 == 1 and torch.allclose(pcaDirections[i], -pcaDirections[i - 1]):
                 previousLipschitzCalculations = BB.lowerBoundClass.calculatedLipschitzConstants
             c = pcaDirections[i]
-            if False:
+            if True:
                 print('** Solving Horizon: ', iteration, 'dimension: ', i)
             initialBub = torch.min(imageData @ c)
             BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, verboseEssential=verboseEssential, inputDimension=dim,
@@ -234,7 +240,7 @@ def main():
             lowerBound, upperBound, space_left = BB.run()
             plottingConstants[i] = -lowerBound
             calculatedLowerBoundsforpcaDirections[i] = lowerBound
-            if False:
+            if True:
                 print(' ')
                 print('Best lower/upper bounds are:', lowerBound, '->' ,upperBound)
 
