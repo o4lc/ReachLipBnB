@@ -111,7 +111,7 @@ class LipschitzBounding:
                                                                   self.network.A.cpu().numpy(),
                                                                   self.network.B.cpu().numpy(),
                                                                   verbose=self.sdpSolverVerbose)]).to(self.device)
-
+                        print(lipschitzConstant)
                         # lipschitzConstant /= 1
                     else:
                         l1 = torch.Tensor([lipSDP2(newWeights, alpha, beta,

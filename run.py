@@ -14,7 +14,7 @@ torch.set_printoptions(precision=8)
 
 def main():
 
-    eps = 0.01
+    eps = 0.001
     verbose = 0
     verboseMultiHorizon = 1
     verboseEssential = 0
@@ -60,8 +60,8 @@ def main():
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
-    # fileName = "quadRotorFullLoopV1.1.pth"
-    # fileName = "quadRotorNormalV1.1.pth"
+    # fileName = "quadRotorFullLoopV1.8.pth"
+    # fileName = "quadRotorNormalV1.4.pth"
 
     A = None
     B = None
@@ -100,7 +100,7 @@ def main():
         c = c * dt
 
         lowerCoordinate = torch.Tensor([4.69, 4.69, 2.9, 0.94, -0.001, -0.001]).to(device)
-        upperCoordinate = torch.Tensor([4.71, 4.71 ,3.1, 0.95,  0.001,  0.001 ]).to(device)
+        upperCoordinate = torch.Tensor([4.71, 4.71, 3.1, 0.95,  0.001,  0.001 ]).to(device)
         # lowerCoordinate = torch.Tensor([4.6, 4.6, 2.9, 0.93, -0.001, -0.001]).to(device)
         # upperCoordinate = torch.Tensor([4.8, 4.9, 3.1, 0.96, 0.001, 0.001]).to(device)
 
@@ -121,9 +121,6 @@ def main():
     upperCoordinate = upperCoordinate.to(device)
 
     network = NeuralNetwork(pathToStateDictionary, A, B, c)
-    print(network.A)
-    print(network.B)
-    print(network.c)
     horizonForLipschitz = 1
     originalNetwork = None
     if performMultiStepSingleHorizon:
