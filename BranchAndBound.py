@@ -196,8 +196,8 @@ class BranchAndBound:
                                   "averageBounds", "weightedGap"]:
             self.spaceNodes[0].score = self.spaceNodes[0].calc_score()
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
-            # if len(self.spaceNodes) > 10000:
-            #     break
+            if len(self.spaceNodes) > 10000:
+                break
             if self.verboseEssential:
                 print(len(self.spaceNodes))
             # for i in range(len(self.spaceNodes)):

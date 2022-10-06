@@ -26,7 +26,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 3
+    finalHorizon = 4
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
@@ -55,13 +55,13 @@ def main():
     # fileName = "doubleIntegrator.pth"
     # fileName = "doubleIntegrator_reachlp.pth"
     # fileName = "quadRotor5.pth"
-    fileName = "quadRotorv2.0.pth"
+    # fileName = "quadRotorv2.0.pth"
     # fileName = "RobotArmStateDict2-50-2.pth"
     # fileName = "Test3-5-3.pth"
     # fileName = "ACASXU.pth"
     # fileName = "mnist_3_50.pth"
     # fileName = "quadRotorFullLoopV1.8.pth"
-    # fileName = "quadRotorNormalV1.4.pth"
+    fileName = "quadRotorNormalV1.2.pth"
 
     A = None
     B = None
@@ -99,8 +99,10 @@ def main():
         c = torch.Tensor([0, 0, 0, 0, 0, -9.8])
         c = c * dt
 
-        lowerCoordinate = torch.Tensor([4.69, 4.69, 2.9, 0.94, -0.001, -0.001]).to(device)
-        upperCoordinate = torch.Tensor([4.71, 4.71, 3.1, 0.95,  0.001,  0.001 ]).to(device)
+        lowerCoordinate = torch.Tensor([-4.69, -4.69, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
+        upperCoordinate = torch.Tensor([-4.71, -4.71, 3.0025, 0.9501,  0.0001,  0.0001 ]).to(device)
+        # lowerCoordinate = torch.Tensor([4.6975, 4.6975, 2.9975, 0.9499, -0.0001, -0.0001]).to(device)
+        # upperCoordinate = torch.Tensor([4.7025, 4.7025, 3.0025, 0.9501, 0.0001, 0.0001]).to(device)
         # lowerCoordinate = torch.Tensor([4.6, 4.6, 2.9, 0.93, -0.001, -0.001]).to(device)
         # upperCoordinate = torch.Tensor([4.8, 4.9, 3.1, 0.96, 0.001, 0.001]).to(device)
 
@@ -276,7 +278,7 @@ def main():
             plt.axis("equal")
             if fileName != "RobotArmStateDict2-50-2.pth":
                 leg1 = plt.legend()
-            plt.title("Robot Arm")
+            # plt.title("Robot Arm")
             plt.xlabel('$x_0$')
             plt.ylabel('$x_1$')
 
@@ -324,8 +326,12 @@ def main():
     print('The algorithm took (s):', endTime - startTime, 'with eps =', eps)
 
     torch.save(plottingData, "Output/reachLip" + fileName)
+    return endTime - startTime
 
 
 if __name__ == '__main__':
-    main()
+    runTimes = []
+    for i in range(1):
+        runTimes.append(main())
+    print(np.mean(runTimes))
     plt.show()
