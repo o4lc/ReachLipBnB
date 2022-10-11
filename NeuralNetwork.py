@@ -31,6 +31,9 @@ class NeuralNetwork(nn.Module):
         stateDict = torch.load(path, map_location=torch.device("cpu"))
         self.load_state_dict(stateDict)
 
+    def setRepetition(self, repetition):
+        self.repetition = repetition
+
     def forward(self, x):
         x = self.rotation(x)
         for i in range(self.repetition):

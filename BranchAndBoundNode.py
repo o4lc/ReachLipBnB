@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+
 class BB_node:
     def __init__(self, up=np.infty, low=-np.infty, coordUp: torch.Tensor=None, coordLow: torch.Tensor=None,
                         scoreFunction='length'):

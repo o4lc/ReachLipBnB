@@ -1,7 +1,5 @@
-import torch
-
 from packages import *
-from utilities import Plotter
+from Utilities.Plotter import Plotter
 from BranchAndBoundNode import BB_node
 from Bounding.LipschitzBound import LipschitzBounding
 from Bounding.PgdUpperBound import PgdUpperBound
@@ -61,17 +59,12 @@ class BranchAndBound:
                               "branch", "branch:prune", "branch:maxFind", "branch:nodeCreation",
                               ])
         self.numberOfBranches = 0
+        self.spaceOutThreshold = 40000
 
     def prune(self):
-        # slightly faster since this starts deleting from the end of the list.
         for i in range(len(self.spaceNodes) - 1, -1, -1):
             if self.spaceNodes[i].lower > self.bestUpperBound:
                 self.spaceNodes.pop(i)
-        # for node in self.spaceNodes:
-        #     if node.lower >= self.bestUpperBound:
-        #         self.spaceNodes.remove(node)
-        #         if self.verbose:
-        #             print('deleted')
 
     def lowerBound(self, indices):
         lowerBounds = torch.vstack([self.spaceNodes[index].coordLower for index in indices])
@@ -82,15 +75,14 @@ class BranchAndBound:
         return self.upperBoundClass.upperBound(indices, self.spaceNodes, self.queryCoefficient)
 
     def branch(self):
-
         # Prunning Function
         self.timers.start("branch:prune")
         self.prune()
         self.timers.pause("branch:prune")
         numNodesAfterPrune = len(self.spaceNodes)
 
+
         self.timers.start("branch:maxFind")
-        #@TODO Choosing the node to branch -> this parts should be swaped with the sort idea
         scoreArray = torch.Tensor([self.spaceNodes[i].score for i in range(len(self.spaceNodes))])
         scoreArraySorted = torch.argsort(scoreArray)
         if len(self.spaceNodes) > self.branchNodeNum:
@@ -98,16 +90,13 @@ class BranchAndBound:
         else:
             maxIndices = scoreArraySorted[:]
 
-
         deletedUpperBounds = []
         deletedLowerBounds = []
         nodes = []
         maxIndices, __ = torch.sort(maxIndices, descending=True)
-        # print('\n\n\n', maxIndices, scoreArray, scoreArraySorted)
         for maxIndex in maxIndices:
             node = self.spaceNodes.pop(maxIndex)
             nodes.append(node)
-            # print("!!!", maxIndex, node.upper, node.lower)
             for i in range(self.nodeBranchingFactor):
                 deletedUpperBounds.append(node.upper)
                 deletedLowerBounds.append(node.lower)
@@ -118,21 +107,10 @@ class BranchAndBound:
             self.timers.start("branch:nodeCreation")
             coordToSplitSorted = torch.argsort(nodes[j].coordUpper - nodes[j].coordLower)
             coordToSplit = coordToSplitSorted[len(coordToSplitSorted) - 1]
-            # print(coordToSplit)
-            #@TODO This can be optimized by keeping the best previous 'x's in that space
             node = nodes[j]
-
-
-            # '''
-            # @TODO
-            # Python Float Calculation Problem
-            # Need to round up ?
-            # '''
             parentNodeUpperBound = node.coordUpper
             parentNodeLowerBound = node.coordLower
 
-
-            # Numpy can do this more efficently!
             newIntervals = torch.linspace(parentNodeLowerBound[coordToSplit],
                                                     parentNodeUpperBound[coordToSplit],
                                                     self.nodeBranchingFactor + 1)
@@ -154,18 +132,12 @@ class BranchAndBound:
 
         return [len(self.spaceNodes) - j for j in range(1, numNodesAdded + 1)], deletedUpperBounds, deletedLowerBounds
 
-    def bound(self, indices, parent_ub, parent_lb):
-
+    def bound(self, indices, parent_lb):
         self.timers.start("lowerBound")
         lowerBounds = torch.maximum(self.lowerBound(indices), parent_lb)
-        # print("Start bounds" + "--------" * 15)
-        # print("## LOWER BOUNDS ", lowerBounds)
         self.timers.pause("lowerBound")
         self.timers.start("upperBound")
         upperBounds = self.upperBound(indices)
-        # print("## UPPER BOUNDS ", upperBounds)
-        # print("End bounds" + "--------" * 15)
-        # print(upperBounds)
         self.timers.pause("upperBound")
         for i, index in enumerate(indices):
             self.spaceNodes[index].upper = upperBounds[i]
@@ -174,8 +146,7 @@ class BranchAndBound:
     def run(self):
         if self.initialGD:
             initUpperBoundClass = PgdUpperBound(self.network, 10, 1000, 0.001,
-                                             self.inputDimension, self.device, self.maximumBatchSize)
-
+                                                self.inputDimension, self.device, self.maximumBatchSize)
 
             if self.bestUpperBound:
                 self.bestUpperBound =\
@@ -190,31 +161,20 @@ class BranchAndBound:
 
         if self.verbose:
             plotter = Plotter()
-
-        self.bound([0], self.bestUpperBound, self.bestLowerBound)
+        self.bound([0], self.bestLowerBound)
         if self.scoreFunction in ["worstLowerBound", "bestLowerBound", "bestUpperBound", "worstUpperBound",
                                   "averageBounds", "weightedGap"]:
             self.spaceNodes[0].score = self.spaceNodes[0].calc_score()
+
         while self.bestUpperBound - self.bestLowerBound >= self.eps:
-            if len(self.spaceNodes) > 10000:
+            if len(self.spaceNodes) > self.spaceOutThreshold:
                 break
             if self.verboseEssential:
                 print(len(self.spaceNodes))
-            # for i in range(len(self.spaceNodes)):
-            #     if self.spaceNodes[i].lower > self.spaceNodes[i].upper:
-            #         print("@@: ", i, self.spaceNodes[i].lower, self.spaceNodes[i].upper)
-            #         raise
             self.timers.start("branch")
             indices, deletedUb, deletedLb = self.branch()
-            # print(indices, end=" ")
-            # print("------", end=" ")
-            # print(deletedUb, end=" ** ** ")
-            # print(deletedLb)
-            # print([self.spaceNodes[i].coordLower for i in indices])
-            # print([self.spaceNodes[i].coordUpper for i in indices])
             self.timers.pause("branch")
-
-            self.bound(indices, deletedUb, deletedLb)
+            self.bound(indices, deletedLb)
 
             if self.scoreFunction in ["worstLowerBound", "bestLowerBound", "bestUpperBound", "worstUpperBound",
                                       "averageBounds", "weightedGap"]:
@@ -227,25 +187,22 @@ class BranchAndBound:
 
             self.timers.start("bestBound")
 
-            # TODO: make this better by keeping the previous one.
             self.bestUpperBound =\
                 torch.minimum(self.bestUpperBound,
                               torch.min(torch.Tensor([self.spaceNodes[i].upper for i in range(len(self.spaceNodes))])))
             self.bestLowerBound = torch.min(
                 torch.Tensor([self.spaceNodes[i].lower for i in range(len(self.spaceNodes))]))
             self.timers.pause("bestBound")
-            #1.08618
             if self.verboseEssential:
                 print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound, "diff", self.bestUpperBound - self.bestLowerBound)
 
             if self.verbose:
-                # print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound)
+                print('Best LB', self.bestLowerBound, 'Best UB', self.bestUpperBound)
                 plotter.plotSpace(self.spaceNodes, self.initCoordLow, self.initCoordUp)
-                # print('--------------------')
-        if False:
-            print("Number of created nodes: {}".format(self.numberOfBranches))
-        if self.verbose:
+                print('----------' * 10)
 
+        if self.verbose:
+            print("Number of created nodes: {}".format(self.numberOfBranches))
             plotter.showAnimation(self.spaceNodes, self.currDim)
         self.timers.pauseAll()
         if self.verboseEssential:
