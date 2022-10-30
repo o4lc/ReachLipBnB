@@ -117,7 +117,7 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
 
 def main():
     configFolder = "Config/"
-    fileName = "doubleIntegrator"
+    fileName = "robotArm"
     configFileToLoad = configFolder + fileName + ".json"
 
     with open(configFileToLoad, 'r') as file:
@@ -198,7 +198,6 @@ def main():
         pcaDirections, data_comp, data_mean, inputData = calculateDirectionsOfOptimization(onlyPcaDirections, imageData)
 
         if verboseMultiHorizon:
-            # plt.figure()
             plt.scatter(imageData[:, 0], imageData[:, 1], marker='.', label='Horizon ' + str(iteration + 1), alpha=0.5)
 
 
@@ -217,6 +216,7 @@ def main():
         solveSingleStepReachability(pcaDirections, imageData, config, iteration, device, network,
                                     plottingConstants, calculatedLowerBoundsforpcaDirections,
                                     originalNetwork, horizonForLipschitz, lowerCoordinate, upperCoordinate)
+
 
         if finalHorizon > 1:
             rotation = nn.Linear(dim, dim)
@@ -247,6 +247,7 @@ def main():
             ax.set_xlim([0, 5])
             ax.set_ylim([-4, 5])
 
+
             plt.axis("equal")
             if "robotarm" not in configFileToLoad.lower():
                 leg1 = plt.legend()
@@ -273,7 +274,7 @@ def main():
             [-0.30535603,  0.09282264]]
             ])
             plottingData["reachlp"] = reachlp
-            for i in range(len(reachlp)):
+            for i in range(min(finalHorizon, len(reachlp))):
                 currHorizon = reachlp[i]
                 rectangle = patches.Rectangle((currHorizon[0][0], currHorizon[1][0]),
                                 currHorizon[0][1] - currHorizon[0][0],
@@ -286,9 +287,7 @@ def main():
             ax.legend(custom_lines, ['ReachLP', 'ReachLipSDP'], loc=4)
             
 
-        # plt.gca().add_artist(leg1)
         plt.savefig("reachabilityPics/" + fileName + "Iteration" + str(iteration) + ".png")
-        # plt.show()
 
     endTime = time.time()
 
@@ -302,5 +301,5 @@ if __name__ == '__main__':
     runTimes = []
     for i in range(1):
         runTimes.append(main())
-    print(np.mean(runTimes))
+    print('Average run time: ', np.mean(runTimes))
     plt.show()

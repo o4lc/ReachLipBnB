@@ -24,7 +24,6 @@ class Plotter():
         rectangle = patches.Rectangle((lowCoord[0], lowCoord[1]), upperCoord[0] - lowCoord[0], upperCoord[1] - lowCoord[1], 
                                     edgecolor=None, facecolor="lightgrey", linewidth=7, alpha=0.5)
         self.ax.add_patch(rectangle)
-
         # print(space)
         for node in space:
             # rectangle = patches.Rectangle((node.coordLower[0], node.coordLower[1]), 
