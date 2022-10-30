@@ -217,7 +217,6 @@ def main():
                                     plottingConstants, calculatedLowerBoundsforpcaDirections,
                                     originalNetwork, horizonForLipschitz, lowerCoordinate, upperCoordinate)
 
-
         if finalHorizon > 1:
             rotation = nn.Linear(dim, dim)
             rotation.weight = torch.nn.parameter.Parameter(torch.linalg.inv(torch.from_numpy(data_comp).float().to(device)))
@@ -246,7 +245,6 @@ def main():
             ax = pltp.plot(ax, alpha = 0.1, color='grey', edgecolor='black')
             ax.set_xlim([0, 5])
             ax.set_ylim([-4, 5])
-
 
             plt.axis("equal")
             if "robotarm" not in configFileToLoad.lower():
