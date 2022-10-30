@@ -89,22 +89,22 @@ class LipschitzBounding:
                     alpha = np.zeros((num_neurons, 1))
                     beta = np.ones((num_neurons, 1))
                     if self.horizon == 1:
-                        lipschitzConstant = torch.Tensor([lipSDP2(newWeights, alpha, beta,
-                                                                  queryCoefficient.unsqueeze(0).cpu().numpy(),
-                                                                  self.network.A.cpu().numpy(),
-                                                                  self.network.B.cpu().numpy(),
-                                                                  verbose=self.sdpSolverVerbose)]).to(self.device)
+                        lipschitzConstant = torch.Tensor([lipSDP(newWeights, alpha, beta,
+                                                                 queryCoefficient.unsqueeze(0).cpu().numpy(),
+                                                                 self.network.A.cpu().numpy(),
+                                                                 self.network.B.cpu().numpy(),
+                                                                 verbose=self.sdpSolverVerbose)]).to(self.device)
                     else:
-                        l1 = torch.Tensor([lipSDP2(newWeights, alpha, beta,
-                                                   queryCoefficient.unsqueeze(0).cpu().numpy(),
-                                                   self.network.A.cpu().numpy(),
-                                                   self.network.B.cpu().numpy(),
-                                                   verbose=self.sdpSolverVerbose)]).to(self.device)
-                        l2 = torch.Tensor([lipSDP2(newWeights, alpha, beta,
-                                                   np.eye(self.network.A.shape[0]),
-                                                   self.network.A.cpu().numpy(),
-                                                   self.network.B.cpu().numpy(),
-                                                   verbose=self.sdpSolverVerbose)]).to(self.device)
+                        l1 = torch.Tensor([lipSDP(newWeights, alpha, beta,
+                                                  queryCoefficient.unsqueeze(0).cpu().numpy(),
+                                                  self.network.A.cpu().numpy(),
+                                                  self.network.B.cpu().numpy(),
+                                                  verbose=self.sdpSolverVerbose)]).to(self.device)
+                        l2 = torch.Tensor([lipSDP(newWeights, alpha, beta,
+                                                  np.eye(self.network.A.shape[0]),
+                                                  self.network.A.cpu().numpy(),
+                                                  self.network.B.cpu().numpy(),
+                                                  verbose=self.sdpSolverVerbose)]).to(self.device)
                         lipschitzConstant = l1 * l2 ** (self.horizon - 1)
                 else:
                     lipschitzConstant = torch.from_numpy(
@@ -363,7 +363,7 @@ class LipschitzBounding:
         return s, t
 
 
-def lipSDP2(weights, alpha, beta, coef, Asys, Bsys, verbose=False):
+def lipSDP(weights, alpha, beta, coef, Asys=None, Bsys=None, verbose=False):
     # @TODO: Possible bug in weights input
     num_layers = len(weights) - 1
     dim_in = weights[0].shape[1]
@@ -372,7 +372,11 @@ def lipSDP2(weights, alpha, beta, coef, Asys, Bsys, verbose=False):
     hidden_dims = [weights[i].shape[0] for i in range(0, num_layers)]
     dims = [dim_in] + hidden_dims + [dim_out]
     num_neurons = sum(hidden_dims)
-    
+
+    if Asys is None:
+        Asys = np.zeros((dim_in, dim_in))
+        Bsys = np.eye(dim_in)
+
     # decision vars
     Lambda = cp.Variable((num_neurons, 1), nonneg=True)
     T = cp.diag(Lambda)

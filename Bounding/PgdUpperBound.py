@@ -65,31 +65,6 @@ class PgdUpperBound:
 
         x = Variable(x0, requires_grad=True)
 
-        # # Batch Gradient Descent
-        # for i in range(self.pgdIterNum):
-        #     x.requires_grad = True
-        #     with torch.autograd.profiler.profile() as prof:
-        #         def loss_reducer(x):
-        #             return self.network.forward(x) @ queryCoefficient
-
-        #         gradient = jacobian(loss_reducer, x)
-
-        #     with no_grad():
-        #         x = x - self.pgdStepSize * gradient.sum(-self.inputDimension)
-
-
-        # Per Sample Gradient Descent
-        # for i in range(self.pgdIterNum):
-        #     x.requires_grad = True
-        #     with torch.autograd.profiler.profile() as prof:
-        #         fmodel, params, buffers = make_functional_with_buffers(self.network)
-        #         print(fmodel)
-        #         return None
-
-
-        #     with no_grad():
-        #         x = x - self.eta * gradient.sum(-self.pgdNumberOfInitializations)
-
         # Gradient Descent
         for i in range(self.pgdIterNum):
             x.requires_grad = True

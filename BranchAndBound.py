@@ -19,6 +19,7 @@ class BranchAndBound:
                  originalNetwork=None,
                  horizonForLipschitz=1,
                  initialBub=None,
+                 spaceOutThreshold=10000
                  ):
 
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
@@ -59,7 +60,7 @@ class BranchAndBound:
                               "branch", "branch:prune", "branch:maxFind", "branch:nodeCreation",
                               ])
         self.numberOfBranches = 0
-        self.spaceOutThreshold = 40000
+        self.spaceOutThreshold = spaceOutThreshold
 
     def prune(self):
         for i in range(len(self.spaceNodes) - 1, -1, -1):

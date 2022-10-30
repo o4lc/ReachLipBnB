@@ -23,6 +23,12 @@ def main():
     plotProjectionsOfHigherDims = True
     onlyPcaDirections = False
     fullLoop = False
+    spaceOutThreshold = 40000
+    nodeBranchingFactor = 2
+    branchNodeNum = 512
+    pgdIterNum = 0
+    pgdNumberOfInitializations = 1
+    pgdStepSize = 0.5
 
     A = None
     B = None
@@ -91,6 +97,12 @@ def main():
         "plotProjectionsOfHigherDims": plotProjectionsOfHigherDims,
         "onlyPcaDirections": onlyPcaDirections,
         "fullLoop": fullLoop,
+        "spaceOutThreshold": spaceOutThreshold,
+        "nodeBranchingFactor": nodeBranchingFactor,
+        "branchNodeNum": branchNodeNum,
+        "pgdIterNum": pgdIterNum,
+        "pgdNumberOfInitializations": pgdNumberOfInitializations,
+        "pgdStepSize": pgdStepSize,
         "A": None if A is None else A.tolist(),
         "B": None if B is None else B.tolist(),
         "c": None if c is None else c.tolist(),

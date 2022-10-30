@@ -72,6 +72,12 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
     useSdpForLipschitzCalculation = config['useSdpForLipschitzCalculation']
     lipschitzSdpSolverVerbose = config['lipschitzSdpSolverVerbose']
     initialGD = config['initialGD']
+    nodeBranchingFactor = config['nodeBranchingFactor']
+    branchNodeNum = config['branchNodeNum']
+    pgdIterNum = config['pgdIterNum']
+    pgdNumberOfInitializations = config['pgdNumberOfInitializations']
+    pgdStepSize = config['pgdStepSize']
+    spaceOutThreshold = config['spaceOutThreshold']
     dim = network.Linear[0].weight.shape[1]
 
     for i in range(len(pcaDirections)):
@@ -86,9 +92,9 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
         BB = BranchAndBound(upperCoordinate, lowerCoordinate, verbose=verbose, verboseEssential=verboseEssential,
                             inputDimension=dim,
                             eps=eps, network=network, queryCoefficient=c, currDim=i, device=device,
-                            nodeBranchingFactor=2, branchNodeNum=512,
+                            nodeBranchingFactor=nodeBranchingFactor, branchNodeNum=branchNodeNum,
                             scoreFunction=scoreFunction,
-                            pgdIterNum=0, pgdNumberOfInitializations=1, pgdStepSize=0.5,
+                            pgdIterNum=pgdIterNum, pgdNumberOfInitializations=pgdNumberOfInitializations, pgdStepSize=pgdStepSize,
                             virtualBranching=virtualBranching,
                             numberOfVirtualBranches=numberOfVirtualBranches,
                             maxSearchDepthLipschitzBound=maxSearchDepthLipschitzBound,
@@ -99,7 +105,8 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
                             previousLipschitzCalculations=previousLipschitzCalculations,
                             originalNetwork=originalNetwork,
                             horizonForLipschitz=horizonForLipschitz,
-                            initialBub=initialBub
+                            initialBub=initialBub,
+                            spaceOutThreshold=spaceOutThreshold
                             )
         lowerBound, upperBound, space_left = BB.run()
         plottingConstants[i] = -lowerBound
@@ -109,7 +116,10 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
 
 
 def main():
-    configFileToLoad = "Config/doubleIntegrator.json"
+    configFolder = "Config/"
+    fileName = "doubleIntegrator"
+    configFileToLoad = configFolder + fileName + ".json"
+
     with open(configFileToLoad, 'r') as file:
         config = json.load(file)
 
@@ -149,34 +159,16 @@ def main():
     print(device)
     print(' ')
 
-    # fileName = "randomNetwork.pth"
-    # fileName = "randomNetwork2.pth"
-    # fileName = "randomNetwork3.pth"
-    # fileName = "trainedNetwork1.pth"
-    # fileName = "doubleIntegrator.pth"
-    # fileName = "doubleIntegrator_reachlp.pth"
-    # fileName = "quadRotor5.pth"
-    # fileName = "quadRotorv2.0.pth"
-    # fileName = "RobotArmStateDict2-50-2.pth"
-    # fileName = "Test3-5-3.pth"
-    # fileName = "ACASXU.pth"
-    # fileName = "mnist_3_50.pth"
-    # fileName = "quadRotorFullLoopV1.8.pth"
-    fileName = "quadRotorNormalV1.2.pth"
-
     lowerCoordinate = lowerCoordinate.to(device)
     upperCoordinate = upperCoordinate.to(device)
 
     network = NeuralNetwork(pathToStateDictionary, A, B, c)
-    # print(network(torch.Tensor([[-.5, -.6]])))
-    # sys.exit(0)
     horizonForLipschitz = 1
     originalNetwork = None
     if performMultiStepSingleHorizon:
         originalNetwork = copy.deepcopy(network)
         horizonForLipschitz = finalHorizon
         network.setRepetition(finalHorizon)
-        # repeatNetwork(network, finalHorizon)
         finalHorizon = 1
 
     dim = network.Linear[0].weight.shape[1]
@@ -191,7 +183,6 @@ def main():
     inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
                                                         + lowerCoordinate
     if verboseMultiHorizon:
-        # fig = plt.figure()
         fig, ax = plt.subplots()
         if "robotarm" not in configFileToLoad.lower():
             plt.scatter(inputData[:, 0], inputData[:, 1], marker='.', label='Initial', alpha=0.5)
@@ -257,13 +248,13 @@ def main():
             ax.set_ylim([-4, 5])
 
             plt.axis("equal")
-            if fileName != "RobotArmStateDict2-50-2.pth":
+            if "robotarm" not in configFileToLoad.lower():
                 leg1 = plt.legend()
             plt.xlabel('$x_0$')
             plt.ylabel('$x_1$')
 
     if verboseMultiHorizon:
-        if fileName == "doubleIntegrator_reachlp.pth":
+        if "doubleintegrator" in configFileToLoad.lower():
             reachlp = np.array([
                 # [[2.5, 3], [-0.25, 0.25]],
             [[ 1.90837383, 2.75 ],
