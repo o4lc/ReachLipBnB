@@ -210,34 +210,6 @@ class LipschitzBounding:
         return lowerBound
 
     @staticmethod
-    def calculateLipschitzConstant(weights: List[torch.Tensor], device=torch.device("cuda", 0),
-                                   normToUse=float("inf")):
-        """
-        :param weights: Weights of the neural network starting from the first layer to the last.
-        :return:
-        """
-        batchSize = weights[0].shape[0]
-        numberOfWeights = len(weights)
-
-        halfTensor = torch.tensor(0.5, device=device)
-        ms = torch.zeros(batchSize, numberOfWeights, dtype=torch.float).to(device)
-        ms[:, 0] = torch.linalg.norm(weights[0], normToUse, dim=(1, 2))
-        for i in range(1, numberOfWeights):
-            multiplier = torch.tensor(1., device=device)
-            temp = torch.zeros(batchSize).to(device)
-            for j in range(i, -1, -1):
-                productMatrix = weights[i]
-                for k in range(i - 1, j - 1, -1):
-                    productMatrix = torch.bmm(productMatrix, weights[k])
-                if j > 0:
-                    multiplier *= halfTensor
-                    temp += multiplier * torch.linalg.norm(productMatrix, normToUse, dim=(1, 2)) * ms[:, j - 1]
-                else:
-                    temp += multiplier * torch.linalg.norm(productMatrix, normToUse, dim=(1, 2))
-            ms[:, i] = temp
-        return ms
-
-    @staticmethod
     def startTime(timer, timerName):
         try:
             timer.start(timerName)
