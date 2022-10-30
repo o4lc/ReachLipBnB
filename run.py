@@ -109,7 +109,7 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
 
 
 def main():
-    configFileToLoad = "Config/quadRotor.json"
+    configFileToLoad = "Config/doubleIntegrator.json"
     with open(configFileToLoad, 'r') as file:
         config = json.load(file)
 
@@ -168,6 +168,8 @@ def main():
     upperCoordinate = upperCoordinate.to(device)
 
     network = NeuralNetwork(pathToStateDictionary, A, B, c)
+    # print(network(torch.Tensor([[-.5, -.6]])))
+    # sys.exit(0)
     horizonForLipschitz = 1
     originalNetwork = None
     if performMultiStepSingleHorizon:
