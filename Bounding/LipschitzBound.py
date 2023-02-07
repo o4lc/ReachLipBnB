@@ -110,6 +110,10 @@ class LipschitzBounding:
                     lipschitzConstant = torch.from_numpy(
                         self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
                         self.device)
+                if self.normToUse == 2:
+                    lipschitzConstant *= np.sqrt(inputLowerBound.shape[1])
+                elif self.normToUse == 1:
+                    lipschitzConstant *= inputLowerBound.shape[1]
                 self.calculatedLipschitzConstants.append(lipschitzConstant)
                 self.pauseTime(timer, "lowerBound:lipschitzCalc")
             else:
