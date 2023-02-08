@@ -117,7 +117,7 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
 
 def main():
     configFolder = "Config/"
-    fileName = "robotArm"
+    fileName = "doubleIntegrator"
     configFileToLoad = configFolder + fileName + ".json"
 
     with open(configFileToLoad, 'r') as file:

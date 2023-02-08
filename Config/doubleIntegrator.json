@@ -11,7 +11,7 @@
     "useTwoNormDilation": false,
     "useSdpForLipschitzCalculation": true,
     "lipschitzSdpSolverVerbose": false,
-    "finalHorizon": 2,
+    "finalHorizon": 5,
     "initialGD": false,
     "performMultiStepSingleHorizon": false,
     "plotProjectionsOfHigherDims": true,

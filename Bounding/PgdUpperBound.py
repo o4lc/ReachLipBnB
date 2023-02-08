@@ -58,11 +58,15 @@ class PgdUpperBound:
             upperBounds.append(torch.min(y[offset: offset + self.pgdNumberOfInitializations]))
         return upperBounds
 
-    def upperBoundPerIndexWithPgd(self, index, nodes, queryCoefficient):
-        x0 = (nodes[index].coordUpper - nodes[index].coordLower) \
-             * torch.rand(self.pgdNumberOfInitializations, self.inputDimension, device=self.device) \
-             + nodes[index].coordLower
+    def upperBoundPerIndexWithPgd(self, index, nodes, queryCoefficient, x0=None):
 
+        if x0 is None:
+            x0 = (nodes[index].coordUpper - nodes[index].coordLower) \
+                 * torch.rand(self.pgdNumberOfInitializations, self.inputDimension, device=self.device) \
+                 + nodes[index].coordLower
+        # print(x0.shape)
+        # x0 = (nodes[index].coordUpper + nodes[index].coordLower).unsqueeze(0) / 2
+        # print(x0.shape)
         x = Variable(x0, requires_grad=True)
 
         # Gradient Descent

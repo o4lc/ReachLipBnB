@@ -19,11 +19,13 @@ class BranchAndBound:
                  originalNetwork=None,
                  horizonForLipschitz=1,
                  initialBub=None,
+                 initialBubPoint=None,
                  spaceOutThreshold=10000
                  ):
 
         self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = initialBub
+        self.initialBubPoint = initialBubPoint
         self.bestLowerBound = None
         self.initCoordUp = coordUp
         self.initCoordLow = coordLow
@@ -146,14 +148,25 @@ class BranchAndBound:
 
     def run(self):
         if self.initialGD:
-            initUpperBoundClass = PgdUpperBound(self.network, 10, 1000, 0.001,
+            pgdStartTime = time.time()
+            initUpperBoundClass = PgdUpperBound(self.network, 10 if self.initialBubPoint is None else 1, 100, 0.001,
                                                 self.inputDimension, self.device, self.maximumBatchSize)
 
+            pgdUpperBound = torch.Tensor(initUpperBoundClass.upperBoundPerIndexWithPgd(0, self.spaceNodes,
+                                                                                       self.queryCoefficient,
+                                                                                       self.initialBubPoint))
             if self.bestUpperBound:
+                # if pgdUpperBound < self.bestUpperBound:
+                if self.verbose:
+                    print("Improvement percentage of initial PGD over current Best Upper Bound: {}"
+                          .format((pgdUpperBound - self.bestUpperBound) / self.bestUpperBound * 100))
                 self.bestUpperBound =\
-                    torch.minimum(self.bestUpperBound,
-                                  torch.Tensor(initUpperBoundClass.upperBound([0], self.spaceNodes,
-                                                                              self.queryCoefficient)))
+                    torch.minimum(self.bestUpperBound, pgdUpperBound)
+            else:
+                self.bestUpperBound = pgdUpperBound
+
+            timeForInitialGd = time.time() - pgdStartTime
+            # print("Time used in PGD: {}".format(timeForInitialGd))
             if self.verboseEssential:
                 print(self.bestUpperBound)
         elif self.bestUpperBound is None:
