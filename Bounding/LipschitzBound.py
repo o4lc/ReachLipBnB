@@ -26,9 +26,9 @@ class LipschitzBounding:
         self.network = network
         self.device = device
         if originalNetwork:
-            self.weights = self.extractWeightsFromNetwork(originalNetwork)
+            self.weights, self.biases = self.extractWeightsFromNetwork(originalNetwork)
         else:
-            self.weights = self.extractWeightsFromNetwork(self.network)
+            self.weights, self.biases = self.extractWeightsFromNetwork(self.network)
         self.calculatedLipschitzConstants = calculatedLipschitzConstants
         self.maxSearchDepth = maxSearchDepth
         self.performVirtualBranching = virtualBranching
@@ -42,12 +42,48 @@ class LipschitzBounding:
         self.sdpSolverVerbose = sdpSolverVerbose
         self.horizon = horizon
 
+    def calculateLipschitzConstant(self,
+                                   queryCoefficient: torch.Tensor,
+                                   inputLowerBound: torch.Tensor,
+                                   inputUpperBound: torch.Tensor,
+                                   ):
+
+        if (self.normToUse == 2 and not self.useTwoNormDilation) or self.normToUse == 1:
+            if self.useSdpForLipschitzCalculation and self.normToUse == 2:
+                alpha, beta = self.calculateMinMaxSlopes(inputLowerBound, inputUpperBound)
+                if self.horizon == 1:
+                    lipschitzConstant = torch.Tensor([lipSDP(self.weights, alpha, beta,
+                                                             queryCoefficient.unsqueeze(0).cpu().numpy(),
+                                                             self.network.A.cpu().numpy(),
+                                                             self.network.B.cpu().numpy(),
+                                                             verbose=self.sdpSolverVerbose)]).to(self.device)
+                else:
+                    l1 = torch.Tensor([lipSDP(self.weights, alpha, beta,
+                                              queryCoefficient.unsqueeze(0).cpu().numpy(),
+                                              self.network.A.cpu().numpy(),
+                                              self.network.B.cpu().numpy(),
+                                              verbose=self.sdpSolverVerbose)]).to(self.device)
+                    l2 = torch.Tensor([lipSDP(self.weights, alpha, beta,
+                                              np.eye(self.network.A.shape[0]),
+                                              self.network.A.cpu().numpy(),
+                                              self.network.B.cpu().numpy(),
+                                              verbose=self.sdpSolverVerbose)]).to(self.device)
+                    lipschitzConstant = l1 * l2 ** (self.horizon - 1)
+            else:
+                lipschitzConstant = torch.from_numpy(
+                    self.calculateLocalLipschitzConstantSingleBatchNumpy(self.weights, normToUse=self.normToUse))[-1].to(
+                    self.device)
+        else:
+            raise ValueError
+        return lipschitzConstant
+
     def lowerBound(self,
                    queryCoefficient: torch.Tensor,
                    inputLowerBound: torch.Tensor,
                    inputUpperBound: torch.Tensor,
                    virtualBranch=True,
-                   timer=None):
+                   timer=None,
+                   extractedLipschitzConstants=None):
         batchSize = inputUpperBound.shape[0]
         difference = inputUpperBound - inputLowerBound
         if virtualBranch and self.performVirtualBranching:
@@ -80,40 +116,42 @@ class LipschitzBounding:
         # this function is not optimal for cases in which an axis is cut into unequal segments
         dilationVector = difference / torch.tensor(2., device=self.device)
         if (self.normToUse == 2 and not self.useTwoNormDilation) or self.normToUse == 1:
-            if len(self.calculatedLipschitzConstants) == 0:
-                self.startTime(timer, "lowerBound:lipschitzCalc")
-
-                newWeights = [w.cpu().numpy() for w in self.weights]
-                if self.useSdpForLipschitzCalculation and self.normToUse == 2:
-                    num_neurons = sum([newWeights[i].shape[0] for i in range(len(newWeights) - 1)])
-                    alpha = np.zeros((num_neurons, 1))
-                    beta = np.ones((num_neurons, 1))
-                    if self.horizon == 1:
-                        lipschitzConstant = torch.Tensor([lipSDP(newWeights, alpha, beta,
-                                                                 queryCoefficient.unsqueeze(0).cpu().numpy(),
-                                                                 self.network.A.cpu().numpy(),
-                                                                 self.network.B.cpu().numpy(),
-                                                                 verbose=self.sdpSolverVerbose)]).to(self.device)
+            if extractedLipschitzConstants is None:
+                if len(self.calculatedLipschitzConstants) == 0:
+                    self.startTime(timer, "lowerBound:lipschitzCalc")
+                    if self.useSdpForLipschitzCalculation and self.normToUse == 2:
+                        # num_neurons = sum([newWeights[i].shape[0] for i in range(len(newWeights) - 1)])
+                        # alpha = np.zeros((num_neurons, 1))
+                        # beta = np.ones((num_neurons, 1))
+                        alpha, beta = self.calculateMinMaxSlopes(inputLowerBound, inputUpperBound)
+                        if self.horizon == 1:
+                            lipschitzConstant = torch.Tensor([lipSDP(self.weights, alpha, beta,
+                                                                     queryCoefficient.unsqueeze(0).cpu().numpy(),
+                                                                     self.network.A.cpu().numpy(),
+                                                                     self.network.B.cpu().numpy(),
+                                                                     verbose=self.sdpSolverVerbose)]).to(self.device)
+                        else:
+                            l1 = torch.Tensor([lipSDP(self.weights, alpha, beta,
+                                                      queryCoefficient.unsqueeze(0).cpu().numpy(),
+                                                      self.network.A.cpu().numpy(),
+                                                      self.network.B.cpu().numpy(),
+                                                      verbose=self.sdpSolverVerbose)]).to(self.device)
+                            l2 = torch.Tensor([lipSDP(self.weights, alpha, beta,
+                                                      np.eye(self.network.A.shape[0]),
+                                                      self.network.A.cpu().numpy(),
+                                                      self.network.B.cpu().numpy(),
+                                                      verbose=self.sdpSolverVerbose)]).to(self.device)
+                            lipschitzConstant = l1 * l2 ** (self.horizon - 1)
                     else:
-                        l1 = torch.Tensor([lipSDP(newWeights, alpha, beta,
-                                                  queryCoefficient.unsqueeze(0).cpu().numpy(),
-                                                  self.network.A.cpu().numpy(),
-                                                  self.network.B.cpu().numpy(),
-                                                  verbose=self.sdpSolverVerbose)]).to(self.device)
-                        l2 = torch.Tensor([lipSDP(newWeights, alpha, beta,
-                                                  np.eye(self.network.A.shape[0]),
-                                                  self.network.A.cpu().numpy(),
-                                                  self.network.B.cpu().numpy(),
-                                                  verbose=self.sdpSolverVerbose)]).to(self.device)
-                        lipschitzConstant = l1 * l2 ** (self.horizon - 1)
+                        lipschitzConstant = torch.from_numpy(
+                            self.calculateLocalLipschitzConstantSingleBatchNumpy(self.weights, normToUse=self.normToUse))[-1].to(
+                            self.device)
+                    self.calculatedLipschitzConstants.append(lipschitzConstant)
+                    self.pauseTime(timer, "lowerBound:lipschitzCalc")
                 else:
-                    lipschitzConstant = torch.from_numpy(
-                        self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(
-                        self.device)
-                self.calculatedLipschitzConstants.append(lipschitzConstant)
-                self.pauseTime(timer, "lowerBound:lipschitzCalc")
+                    lipschitzConstant = self.calculatedLipschitzConstants[0]
             else:
-                lipschitzConstant = self.calculatedLipschitzConstants[0]
+                lipschitzConstant = extractedLipschitzConstants
             multipliers = torch.linalg.norm(dilationVector, ord=self.normToUse, dim=1)
             additiveTerm = lipschitzConstant * multipliers
         elif self.normToUse == float("inf") or (self.normToUse == 2 and self.useTwoNormDilation):
@@ -151,28 +189,28 @@ class LipschitzBounding:
                     normalizerDilationVector = dilationVector
                 """"""
                 # Torch batch implementation
-                newWeights = [w.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1) for w in self.weights]
-                # w @ D is equivalent to w * dilationVector
-                # newWeights[0] = newWeights[0] @ dMatrix
-
-                newWeights[0] = newWeights[0] * normalizerDilationVector[batchesThatNeedLipschitzConstantCalculation, :].unsqueeze(1)
-                # print(newWeights[0])
-                queryCoefficientRepeated = queryCoefficient.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1)
-                # newWeights[-1] = queryCoefficient @ newWeights[-1]
-
-                newWeights[-1] = torch.bmm(queryCoefficientRepeated, newWeights[-1])
-                # print(newWeights)
-                newCalculatedLipschitzConstants = self.calculateLipschitzConstant(newWeights, self.device, self.normToUse)[:, -1]
+                # newWeights = [w.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1) for w in self.weights]
+                # # w @ D is equivalent to w * dilationVector
+                # # newWeights[0] = newWeights[0] @ dMatrix
+                #
+                # newWeights[0] = newWeights[0] * normalizerDilationVector[batchesThatNeedLipschitzConstantCalculation, :].unsqueeze(1)
+                # # print(newWeights[0])
+                # queryCoefficientRepeated = queryCoefficient.repeat(len(batchesThatNeedLipschitzConstantCalculation), 1, 1)
+                # # newWeights[-1] = queryCoefficient @ newWeights[-1]
+                #
+                # newWeights[-1] = torch.bmm(queryCoefficientRepeated, newWeights[-1])
+                # # print(newWeights)
+                # newCalculatedLipschitzConstants = self.calculateLocalLipschitzConstantTorch(newWeights, self.device, self.normToUse)[:, -1]
                 """"""
-                # # Numpy single batch implementation
-                # newCalculatedLipschitzConstants = []
-                # for i in range(len(batchesThatNeedLipschitzConstantCalculation)):
-                #     newWeights = [w.cpu().numpy() for w in self.weights]
-                #     newWeights[0] = newWeights[0] * normalizerDilationVector[batchesThatNeedLipschitzConstantCalculation[i]:
-                #                                                    batchesThatNeedLipschitzConstantCalculation[i] + 1, :].cpu().numpy()
-                #     newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
-                #     # print(newWeights)
-                #     newCalculatedLipschitzConstants.append(torch.from_numpy(self.calculateLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(self.device))
+                # Numpy single batch implementation
+                newCalculatedLipschitzConstants = []
+                for i in range(len(batchesThatNeedLipschitzConstantCalculation)):
+                    newWeights = [np.copy(w) for w in self.weights]
+                    newWeights[0] = newWeights[0] * normalizerDilationVector[batchesThatNeedLipschitzConstantCalculation[i]:
+                                                                   batchesThatNeedLipschitzConstantCalculation[i] + 1, :].cpu().numpy()
+                    newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
+                    # print(newWeights)
+                    newCalculatedLipschitzConstants.append(torch.from_numpy(self.calculateLocalLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(self.device))
 
                 """"""
                 for i in range(len(newCalculatedLipschitzConstants)):
@@ -224,7 +262,7 @@ class LipschitzBounding:
             pass
 
     @staticmethod
-    def calculateLipschitzConstantSingleBatchNumpy(weights, normToUse=float("inf")):
+    def calculateLocalLipschitzConstantSingleBatchNumpy(weights, normToUse=float("inf")):
         numberOfWeights = len(weights)
         ms = np.zeros(numberOfWeights, dtype=np.float64)
         ms[0] = np.linalg.norm(weights[0], normToUse)
@@ -250,10 +288,13 @@ class LipschitzBounding:
     @staticmethod
     def extractWeightsFromNetwork(network: nn.Module):
         weights = []
+        biases = []
         for name, param in network.Linear.named_parameters():
             if "weight" in name:
-                weights.append(param.detach().clone())
-        return weights
+                weights.append(param.detach().clone().cpu().numpy())
+            elif "bias" in name:
+                biases.append(param.detach().clone().cpu().numpy()[:, np.newaxis])
+        return weights, biases
 
     def extractWeightsForMilp(self):
         weights = []
@@ -334,7 +375,6 @@ class LipschitzBounding:
         :param upperBound: A vector and not an (n * 1) matrix
         :return:
         """
-
         outputLowerBound = (np.maximum(weight, 0) @ (lowerBound[np.newaxis].transpose())
                             + np.minimum(weight, 0) @ (upperBound[np.newaxis].transpose()) + bias).squeeze()
         outputUpperBound = (np.maximum(weight, 0) @ (upperBound[np.newaxis].transpose())
@@ -361,6 +401,21 @@ class LipschitzBounding:
             s.append(sTemp)
             t.append(tTemp)
         return s, t
+
+    def calculateMinMaxSlopes(self, inputLowerBound, inputUpperBound):
+        numberOfNeurons = sum([self.weights[i].shape[0] for i in range(len(self.weights) - 1)])
+        alpha = np.zeros((numberOfNeurons, 1))
+        beta = np.ones((numberOfNeurons, 1))
+        assert inputLowerBound.shape[0] == 1
+        lowerBounds, upperBounds = self.propagateBoundsInNetwork(inputLowerBound[0, :].cpu().numpy(),
+                                                                 inputUpperBound[0, :].cpu().numpy(),
+                                                                 self.weights, self.biases)
+        lowerBounds = np.hstack(lowerBounds[1:-1]).T
+        upperBounds = np.hstack(upperBounds[1:-1]).T
+        alpha[lowerBounds >= 0] = 1
+        beta[upperBounds <= 0] = 0
+        return alpha, beta
+
 
 
 def lipSDP(weights, alpha, beta, coef, Asys=None, Bsys=None, verbose=False):

@@ -1,7 +1,7 @@
 {
     "eps": 0.01,
     "verbose": 0,
-    "verboseMultiHorizon": 1,
+    "verboseMultiHorizon": 0,
     "verboseEssential": 0,
     "scoreFunction": "worstLowerBound",
     "virtualBranching": false,

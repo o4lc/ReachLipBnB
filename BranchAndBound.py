@@ -23,7 +23,24 @@ class BranchAndBound:
                  spaceOutThreshold=10000
                  ):
 
-        self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
+        self.lowerBoundClass = LipschitzBounding(network, device, virtualBranching, maxSearchDepthLipschitzBound,
+                                                 normToUseLipschitz, useTwoNormDilation, useSdpForLipschitzCalculation,
+                                                 numberOfVirtualBranches, lipschitzSdpSolverVerbose,
+                                                 previousLipschitzCalculations,
+                                                 originalNetwork=originalNetwork,
+                                                 horizon=horizonForLipschitz
+                                                 )
+        self.queryCoefficient = queryCoefficient
+        self.calculateLipschitzBeforeNodeCreation = not (normToUseLipschitz == float("inf")
+                                                         or (normToUseLipschitz == 2 and useTwoNormDilation))
+        if self.calculateLipschitzBeforeNodeCreation:
+            lipschitzConstant =\
+                self.lowerBoundClass.calculateLipschitzConstant(self.queryCoefficient, coordLow.unsqueeze(0), coordUp.unsqueeze(0))
+            self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction,
+                                       depth=0, lipschitzConstant=lipschitzConstant)]
+            self.initialLipschitz = lipschitzConstant
+        else:
+            self.spaceNodes = [BB_node(np.infty, -np.infty, coordUp, coordLow, scoreFunction=scoreFunction)]
         self.bestUpperBound = initialBub
         self.initialBubPoint = initialBubPoint
         self.bestLowerBound = None
@@ -37,14 +54,8 @@ class BranchAndBound:
         self.eps = eps
         self.network = network
         self.currDim = currDim
-        self.queryCoefficient = queryCoefficient
-        self.lowerBoundClass = LipschitzBounding(network, device, virtualBranching, maxSearchDepthLipschitzBound,
-                                                 normToUseLipschitz, useTwoNormDilation, useSdpForLipschitzCalculation,
-                                                 numberOfVirtualBranches, lipschitzSdpSolverVerbose,
-                                                 previousLipschitzCalculations,
-                                                 originalNetwork=originalNetwork,
-                                                 horizon=horizonForLipschitz
-                                                 )
+
+
         self.upperBoundClass = PgdUpperBound(network, pgdNumberOfInitializations, pgdIterNum, pgdStepSize,
                                              inputDimension, device, maximumBatchSize)
         self.nodeBranchingFactor = nodeBranchingFactor
@@ -63,6 +74,7 @@ class BranchAndBound:
                               ])
         self.numberOfBranches = 0
         self.spaceOutThreshold = spaceOutThreshold
+        self.lipschitzUpdateDepths = [4]
 
     def prune(self):
         for i in range(len(self.spaceNodes) - 1, -1, -1):
@@ -72,7 +84,13 @@ class BranchAndBound:
     def lowerBound(self, indices):
         lowerBounds = torch.vstack([self.spaceNodes[index].coordLower for index in indices])
         upperBounds = torch.vstack([self.spaceNodes[index].coordUpper for index in indices])
-        return self.lowerBoundClass.lowerBound(self.queryCoefficient, lowerBounds, upperBounds, timer=self.timers)
+        lipschitzConstants = None
+        if self.calculateLipschitzBeforeNodeCreation:
+
+            lipschitzConstants = torch.hstack([self.spaceNodes[index].lipschitzConstant for index in indices])
+
+        return self.lowerBoundClass.lowerBound(self.queryCoefficient, lowerBounds, upperBounds, timer=self.timers,
+                                               extractedLipschitzConstants=lipschitzConstants)
 
     def upperBound(self, indices):
         return self.upperBoundClass.upperBound(indices, self.spaceNodes, self.queryCoefficient)
@@ -123,7 +141,18 @@ class BranchAndBound:
 
                 tempLow[coordToSplit] = newIntervals[i]
                 tempHigh[coordToSplit] = newIntervals[i+1]
-                self.spaceNodes.append(BB_node(np.infty, -np.infty, tempHigh, tempLow, scoreFunction=self.scoreFunction))
+                lipschitzConstant = node.lipschitzConstant
+                depth = node.depth + 1
+                if self.calculateLipschitzBeforeNodeCreation and depth in self.lipschitzUpdateDepths:
+                    # print(depth)
+                    lipschitzConstant =\
+                        self.lowerBoundClass.calculateLipschitzConstant(self.queryCoefficient,
+                                                                        tempLow.unsqueeze(0), tempHigh.unsqueeze(0))
+                    # print(lipschitzConstant / self.initialLipschitz * 100)
+
+                self.spaceNodes.append(
+                    BB_node(np.infty, -np.infty, tempHigh, tempLow, scoreFunction=self.scoreFunction,
+                            depth=depth, lipschitzConstant=lipschitzConstant))
 
                 if torch.any(tempHigh - tempLow < 1e-8):
                     self.spaceNodes[-1].score = -1

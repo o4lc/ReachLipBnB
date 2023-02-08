@@ -111,7 +111,8 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
         lowerBound, upperBound, space_left = BB.run()
         plottingConstants[i] = -lowerBound
         calculatedLowerBoundsforpcaDirections[i] = lowerBound
-
+        print(BB.numberOfBranches)
+        compare memory usage :))))
         print('Best lower/upper bounds are:', lowerBound, '->', upperBound)
 
 

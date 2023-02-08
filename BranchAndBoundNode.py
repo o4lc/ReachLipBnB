@@ -3,8 +3,8 @@ import torch
 
 
 class BB_node:
-    def __init__(self, up=np.infty, low=-np.infty, coordUp: torch.Tensor=None, coordLow: torch.Tensor=None,
-                        scoreFunction='length'):
+    def __init__(self,  up=np.infty, low=-np.infty, coordUp: torch.Tensor=None, coordLow: torch.Tensor=None,
+                        scoreFunction='length', depth=0, lipschitzConstant=None):
         self.upper = up
         self.lower = low
         self.coordUpper = coordUp
@@ -12,6 +12,8 @@ class BB_node:
         self.scoreFunction = scoreFunction
         self.score = None
         self.score = self.calc_score()
+        self.lipschitzConstant = lipschitzConstant
+        self.depth = depth
     
     def calc_score(self, scoreFunction=None):
         #@TODO
