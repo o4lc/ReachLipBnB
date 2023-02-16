@@ -79,7 +79,7 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
     pgdStepSize = config['pgdStepSize']
     spaceOutThreshold = config['spaceOutThreshold']
     dim = network.Linear[0].weight.shape[1]
-
+    totalNumberOfBranches = 0
     for i in range(len(pcaDirections)):
         previousLipschitzCalculations = []
         if i % 2 == 1 and torch.allclose(pcaDirections[i], -pcaDirections[i - 1]):
@@ -111,14 +111,15 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
         lowerBound, upperBound, space_left = BB.run()
         plottingConstants[i] = -lowerBound
         calculatedLowerBoundsforpcaDirections[i] = lowerBound
-        print(BB.numberOfBranches)
-        compare memory usage :))))
+        totalNumberOfBranches += BB.numberOfBranches
+
         print('Best lower/upper bounds are:', lowerBound, '->', upperBound)
+    return totalNumberOfBranches
 
 
 def main():
     configFolder = "Config/"
-    fileName = "doubleIntegrator"
+    fileName = "quadRotor"
     configFileToLoad = configFolder + fileName + ".json"
 
     with open(configFileToLoad, 'r') as file:
@@ -181,7 +182,7 @@ def main():
 
     plottingData = {}
 
-    inputData = (upperCoordinate - lowerCoordinate) * torch.rand(1000, dim, device=device) \
+    inputData = (upperCoordinate - lowerCoordinate) * torch.rand(10000, dim, device=device) \
                                                         + lowerCoordinate
     if verboseMultiHorizon:
         fig, ax = plt.subplots()
@@ -190,7 +191,7 @@ def main():
     plottingData[0] = {"exactSet": inputData}
 
     startTime = time.time()
-
+    totalNumberOfBranches = 0
     for iteration in range(finalHorizon):
         inputDataVariable = Variable(inputData, requires_grad=False)
         with no_grad():
@@ -214,9 +215,10 @@ def main():
         pcaDirections = torch.Tensor(np.array(pcaDirections))
         calculatedLowerBoundsforpcaDirections = torch.Tensor(np.zeros(len(pcaDirections)))
 
-        solveSingleStepReachability(pcaDirections, imageData, config, iteration, device, network,
+        t1 = solveSingleStepReachability(pcaDirections, imageData, config, iteration, device, network,
                                     plottingConstants, calculatedLowerBoundsforpcaDirections,
                                     originalNetwork, horizonForLipschitz, lowerCoordinate, upperCoordinate)
+        totalNumberOfBranches += t1
 
         if finalHorizon > 1:
             rotation = nn.Linear(dim, dim)
@@ -291,7 +293,7 @@ def main():
     endTime = time.time()
 
     print('The algorithm took (s):', endTime - startTime, 'with eps =', eps)
-
+    print("Total number of branches: {}".format(totalNumberOfBranches))
     torch.save(plottingData, "Output/reachLip" + fileName)
     return endTime - startTime
 

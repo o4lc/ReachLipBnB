@@ -74,7 +74,7 @@ class BranchAndBound:
                               ])
         self.numberOfBranches = 0
         self.spaceOutThreshold = spaceOutThreshold
-        self.lipschitzUpdateDepths = [4]
+        self.lipschitzUpdateDepths = [0]
 
     def prune(self):
         for i in range(len(self.spaceNodes) - 1, -1, -1):

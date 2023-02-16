@@ -93,6 +93,13 @@ class LipschitzBounding:
                          for _ in range(self.numberOfVirtualBranches)]
             newUppers = [inputUpperBound[i, :].clone() for i in range(batchSize)
                          for _ in range(self.numberOfVirtualBranches)]
+            virtualBranchLipschitz = None
+            if extractedLipschitzConstants is not None:
+                virtualBranchLipschitz =\
+                    torch.zeros(self.numberOfVirtualBranches * extractedLipschitzConstants.shape[0]).to(self.device)
+                for i in range(batchSize):
+                    virtualBranchLipschitz[self.numberOfVirtualBranches * i: self.numberOfVirtualBranches * (i +1)] =\
+                        extractedLipschitzConstants[i]
             for i in range(batchSize):
                 for j in range(self.numberOfVirtualBranches):
                     newUppers[self.numberOfVirtualBranches * i + j][maxIndices[i]] = \
@@ -105,7 +112,8 @@ class LipschitzBounding:
             newUppers = torch.vstack(newUppers)
             self.pauseTime(timer, "lowerBound:virtualBranchPreparation")
 
-            virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False, timer=timer)
+            virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False, timer=timer,
+                                                            extractedLipschitzConstants=virtualBranchLipschitz)
             self.startTime(timer, "lowerBound:virtualBranchMin")
 
             virtualBranchLowerBounds = torch.Tensor([torch.min(
@@ -406,6 +414,7 @@ class LipschitzBounding:
         numberOfNeurons = sum([self.weights[i].shape[0] for i in range(len(self.weights) - 1)])
         alpha = np.zeros((numberOfNeurons, 1))
         beta = np.ones((numberOfNeurons, 1))
+
         assert inputLowerBound.shape[0] == 1
         lowerBounds, upperBounds = self.propagateBoundsInNetwork(inputLowerBound[0, :].cpu().numpy(),
                                                                  inputUpperBound[0, :].cpu().numpy(),

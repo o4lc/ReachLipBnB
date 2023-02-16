@@ -4,7 +4,7 @@ import numpy as np
 
 
 def main():
-    fileName = "robotArm"
+    fileName = "unicycle"
     eps = 0.01
     verbose = 0
     verboseMultiHorizon = 1
@@ -17,7 +17,7 @@ def main():
     useTwoNormDilation = False
     useSdpForLipschitzCalculation = True
     lipschitzSdpSolverVerbose = False
-    finalHorizon = 1
+    finalHorizon = 5
     initialGD = False
     performMultiStepSingleHorizon = False
     plotProjectionsOfHigherDims = True
@@ -30,9 +30,10 @@ def main():
     pgdNumberOfInitializations = 1
     pgdStepSize = 0.5
 
-    A = None
-    B = None
-    c = None
+    # A = None
+    # B = None
+    # c = None
+
     # dt = None
     # if fileName == "doubleIntegrator.pth" or fileName == "doubleIntegrator_reachlp.pth":
     # A = torch.Tensor([[1, 1], [0, 1]])
@@ -72,11 +73,16 @@ def main():
     # upperCoordinate = torch.Tensor([4.8, 4.9, 3.1, 0.96, 0.001, 0.001])
 
     # elif fileName == "RobotArmStateDict2-50-2.pth":
-    lowerCoordinate = torch.Tensor([np.pi / 3., np.pi / 3.])
-    upperCoordinate = torch.Tensor([2 * np.pi / 3., 2 * np.pi / 3.])
+    # lowerCoordinate = torch.Tensor([np.pi / 3., np.pi / 3.])
+    # upperCoordinate = torch.Tensor([2 * np.pi / 3., 2 * np.pi / 3.])
 
+    A = torch.eye(2)
+    B = torch.eye(2)
+    c = torch.tensor([0])
+    lowerCoordinate = -torch.ones(2)
+    upperCoordinate = torch.ones(2)
 
-    pathToStateDictionary = "Networks/" + "RobotArmStateDict2-50-2" + ".pth"
+    pathToStateDictionary = "Networks/" + "unicycle" + ".pth"
 
     configDictionary = {
         "eps": eps,
