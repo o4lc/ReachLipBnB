@@ -85,7 +85,7 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
         if i % 2 == 1 and torch.allclose(pcaDirections[i], -pcaDirections[i - 1]):
             previousLipschitzCalculations = BB.lowerBoundClass.calculatedLipschitzConstants
         c = pcaDirections[i]
-        if True:
+        if False:
             print('** Solving Horizon: ', iteration, 'dimension: ', i)
         initialBub = torch.min(imageData @ c)
         # initialBub = None
@@ -113,13 +113,14 @@ def solveSingleStepReachability(pcaDirections, imageData, config, iteration, dev
         calculatedLowerBoundsforpcaDirections[i] = lowerBound
         totalNumberOfBranches += BB.numberOfBranches
 
-        print('Best lower/upper bounds are:', lowerBound, '->', upperBound)
+        if False:
+            print('Best lower/upper bounds are:', lowerBound, '->', upperBound)
     return totalNumberOfBranches
 
 
 def main():
     configFolder = "Config/"
-    fileName = "quadRotor"
+    fileName = "doubleIntegrator"
     configFileToLoad = configFolder + fileName + ".json"
 
     with open(configFileToLoad, 'r') as file:
@@ -135,7 +136,7 @@ def main():
     onlyPcaDirections = config['onlyPcaDirections']
     pathToStateDictionary = config['pathToStateDictionary']
     fullLoop = config['fullLoop']
-    if config['A']:
+    if config['A'] and not fullLoop:
         A = torch.Tensor(config['A'])
         B = torch.Tensor(config['B'])
         c = torch.Tensor(config['c'])
@@ -295,12 +296,18 @@ def main():
     print('The algorithm took (s):', endTime - startTime, 'with eps =', eps)
     print("Total number of branches: {}".format(totalNumberOfBranches))
     torch.save(plottingData, "Output/reachLip" + fileName)
-    return endTime - startTime
+    return endTime - startTime, totalNumberOfBranches
 
 
 if __name__ == '__main__':
     runTimes = []
-    for i in range(1):
-        runTimes.append(main())
-    print('Average run time: ', np.mean(runTimes))
+    numberOfBrancehs = []
+    for i in range(100):
+        t1, t2 = main()
+        runTimes.append(t1)
+        numberOfBrancehs.append(t2)
+    print('Average run time: {}, std {}'.format(np.mean(runTimes), np.std(runTimes)))
+    print('Average branches: {}, std {}'.format(np.mean(numberOfBrancehs), np.std(numberOfBrancehs)))
+    
+
     plt.show()
