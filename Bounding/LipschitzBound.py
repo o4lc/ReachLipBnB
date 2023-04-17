@@ -84,43 +84,79 @@ class LipschitzBounding:
                    virtualBranch=True,
                    timer=None,
                    extractedLipschitzConstants=None):
+        if virtualBranch and self.performVirtualBranching:
+            virtualBranchLowerBounds = \
+                self.handleVirtualBranching(inputLowerBound, inputUpperBound,
+                                            queryCoefficient, extractedLipschitzConstants, timer)
+
+        additiveTerm = self.calculateAdditiveTerm(inputLowerBound, inputUpperBound, queryCoefficient,
+                                                  extractedLipschitzConstants, timer)
+
+        centerPoint = (inputUpperBound + inputLowerBound) / torch.tensor(2., device=self.device)
+        with torch.no_grad():
+            self.startTime(timer, "lowerBound:lipschitzForwardPass")
+            lowerBound = self.network(centerPoint) @ queryCoefficient - additiveTerm
+            self.pauseTime(timer, "lowerBound:lipschitzForwardPass")
+
+            # for batchCounter in range(batchSize):
+            #     import time
+            #     startTime = time.time()
+            #     actualLowerBound = self.milpSolver(inputLowerBound[batchCounter, :].numpy(),
+            #                                        inputUpperBound[batchCounter, :].numpy())
+            #     print("took to run MILP", time.time() - startTime)
+            #     print("**", actualLowerBound, lowerBound[batchCounter], inputLowerBound[batchCounter, :], inputUpperBound[batchCounter, :])
+            #     raise
+            #     if actualLowerBound < lowerBound[batchCounter]:
+            #         print(actualLowerBound, lowerBound[batchCounter])
+            #         raise
+        if virtualBranch and self.performVirtualBranching:
+            lowerBound = torch.maximum(lowerBound, virtualBranchLowerBounds)
+        return lowerBound
+
+    def handleVirtualBranching(self, inputLowerBound, inputUpperBound, queryCoefficient,
+                               extractedLipschitzConstants, timer):
+        difference = inputUpperBound - inputLowerBound
+        batchSize = inputUpperBound.shape[0]
+        self.startTime(timer, "lowerBound:virtualBranchPreparation")
+        maxIndices = torch.argmax(difference, 1)
+        newLowers = [inputLowerBound[i, :].clone() for i in range(batchSize)
+                     for _ in range(self.numberOfVirtualBranches)]
+        newUppers = [inputUpperBound[i, :].clone() for i in range(batchSize)
+                     for _ in range(self.numberOfVirtualBranches)]
+        virtualBranchLipschitz = None
+        if extractedLipschitzConstants is not None:
+            virtualBranchLipschitz = \
+                torch.zeros(self.numberOfVirtualBranches * extractedLipschitzConstants.shape[0]).to(self.device)
+            for i in range(batchSize):
+                virtualBranchLipschitz[self.numberOfVirtualBranches * i: self.numberOfVirtualBranches * (i + 1)] = \
+                    extractedLipschitzConstants[i]
+        for i in range(batchSize):
+            for j in range(self.numberOfVirtualBranches):
+                newUppers[self.numberOfVirtualBranches * i + j][maxIndices[i]] = \
+                    newLowers[self.numberOfVirtualBranches * i + j][maxIndices[i]] + \
+                    (j + 1) * difference[i, maxIndices[i]] / self.numberOfVirtualBranches
+                newLowers[self.numberOfVirtualBranches * i + j][maxIndices[i]] += \
+                    j * difference[i, maxIndices[i]] / self.numberOfVirtualBranches
+
+        newLowers = torch.vstack(newLowers)
+        newUppers = torch.vstack(newUppers)
+        self.pauseTime(timer, "lowerBound:virtualBranchPreparation")
+
+        virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False, timer=timer,
+                                                        extractedLipschitzConstants=virtualBranchLipschitz)
+        self.startTime(timer, "lowerBound:virtualBranchMin")
+
+        virtualBranchLowerBounds = torch.Tensor([torch.min(
+            virtualBranchLowerBoundsExtra[i * self.numberOfVirtualBranches:(i + 1) * self.numberOfVirtualBranches])
+            for i in range(0, batchSize)]).to(self.device)
+        self.pauseTime(timer, "lowerBound:virtualBranchMin")
+        return virtualBranchLowerBounds
+
+    def calculateAdditiveTerm(self, inputLowerBound, inputUpperBound, queryCoefficient,
+                              extractedLipschitzConstants,
+                              timer):
         batchSize = inputUpperBound.shape[0]
         difference = inputUpperBound - inputLowerBound
-        if virtualBranch and self.performVirtualBranching:
-            self.startTime(timer, "lowerBound:virtualBranchPreparation")
-            maxIndices = torch.argmax(difference, 1)
-            newLowers = [inputLowerBound[i, :].clone() for i in range(batchSize)
-                         for _ in range(self.numberOfVirtualBranches)]
-            newUppers = [inputUpperBound[i, :].clone() for i in range(batchSize)
-                         for _ in range(self.numberOfVirtualBranches)]
-            virtualBranchLipschitz = None
-            if extractedLipschitzConstants is not None:
-                virtualBranchLipschitz =\
-                    torch.zeros(self.numberOfVirtualBranches * extractedLipschitzConstants.shape[0]).to(self.device)
-                for i in range(batchSize):
-                    virtualBranchLipschitz[self.numberOfVirtualBranches * i: self.numberOfVirtualBranches * (i +1)] =\
-                        extractedLipschitzConstants[i]
-            for i in range(batchSize):
-                for j in range(self.numberOfVirtualBranches):
-                    newUppers[self.numberOfVirtualBranches * i + j][maxIndices[i]] = \
-                        newLowers[self.numberOfVirtualBranches * i + j][maxIndices[i]] +\
-                        (j + 1) * difference[i, maxIndices[i]] / self.numberOfVirtualBranches
-                    newLowers[self.numberOfVirtualBranches * i + j][maxIndices[i]] +=\
-                        j * difference[i, maxIndices[i]] / self.numberOfVirtualBranches
-
-            newLowers = torch.vstack(newLowers)
-            newUppers = torch.vstack(newUppers)
-            self.pauseTime(timer, "lowerBound:virtualBranchPreparation")
-
-            virtualBranchLowerBoundsExtra = self.lowerBound(queryCoefficient, newLowers, newUppers, False, timer=timer,
-                                                            extractedLipschitzConstants=virtualBranchLipschitz)
-            self.startTime(timer, "lowerBound:virtualBranchMin")
-
-            virtualBranchLowerBounds = torch.Tensor([torch.min(
-                virtualBranchLowerBoundsExtra[i * self.numberOfVirtualBranches:(i + 1) * self.numberOfVirtualBranches])
-                for i in range(0, batchSize)]).to(self.device)
-            self.pauseTime(timer, "lowerBound:virtualBranchMin")
-
         # this function is not optimal for cases in which an axis is cut into unequal segments
         dilationVector = difference / torch.tensor(2., device=self.device)
         if (self.normToUse == 2 and not self.useTwoNormDilation) or self.normToUse == 1:
@@ -152,7 +188,8 @@ class LipschitzBounding:
                             lipschitzConstant = l1 * l2 ** (self.horizon - 1)
                     else:
                         lipschitzConstant = torch.from_numpy(
-                            self.calculateLocalLipschitzConstantSingleBatchNumpy(self.weights, normToUse=self.normToUse))[-1].to(
+                            self.calculateLocalLipschitzConstantSingleBatchNumpy(self.weights,
+                                                                                 normToUse=self.normToUse))[-1].to(
                             self.device)
                     self.calculatedLipschitzConstants.append(lipschitzConstant)
                     self.pauseTime(timer, "lowerBound:lipschitzCalc")
@@ -174,7 +211,8 @@ class LipschitzBounding:
                                    max(len(self.calculatedLipschitzConstants) - self.maxSearchDepth, -1), -1):
                         existingDilationVector, lipschitzConstant = self.calculatedLipschitzConstants[i]
                         # if torch.norm(dilationVector[batchCounter, :] - existingDilationVector) < 1e-8:
-                        if torch.allclose(dilationVector[batchCounter, :], existingDilationVector, rtol=1e-3, atol=1e-7):
+                        if torch.allclose(dilationVector[batchCounter, :], existingDilationVector, rtol=1e-3,
+                                          atol=1e-7):
                             if lipschitzConstant == -1:
                                 locationOfUnavailableConstants[batchCounter] = i
                             else:
@@ -214,18 +252,21 @@ class LipschitzBounding:
                 newCalculatedLipschitzConstants = []
                 for i in range(len(batchesThatNeedLipschitzConstantCalculation)):
                     newWeights = [np.copy(w) for w in self.weights]
-                    newWeights[0] = newWeights[0] * normalizerDilationVector[batchesThatNeedLipschitzConstantCalculation[i]:
-                                                                   batchesThatNeedLipschitzConstantCalculation[i] + 1, :].cpu().numpy()
+                    newWeights[0] = newWeights[0] * normalizerDilationVector[
+                                                    batchesThatNeedLipschitzConstantCalculation[i]:
+                                                    batchesThatNeedLipschitzConstantCalculation[i] + 1, :].cpu().numpy()
                     newWeights[-1] = queryCoefficient.unsqueeze(0).cpu().numpy() @ newWeights[-1]
                     # print(newWeights)
-                    newCalculatedLipschitzConstants.append(torch.from_numpy(self.calculateLocalLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[-1].to(self.device))
+                    newCalculatedLipschitzConstants.append(torch.from_numpy(
+                        self.calculateLocalLipschitzConstantSingleBatchNumpy(newWeights, normToUse=self.normToUse))[
+                                                               -1].to(self.device))
 
                 """"""
                 for i in range(len(newCalculatedLipschitzConstants)):
                     self.calculatedLipschitzConstants[locationOfUnavailableConstants[
                         batchesThatNeedLipschitzConstantCalculation[i]]][1] = newCalculatedLipschitzConstants[i]
                 for unavailableBatch in locationOfUnavailableConstants.keys():
-                    lipschitzConstants[unavailableBatch] =\
+                    lipschitzConstants[unavailableBatch] = \
                         self.calculatedLipschitzConstants[locationOfUnavailableConstants[unavailableBatch]][1]
 
             self.pauseTime(timer, "lowerBound:lipschitzCalc")
@@ -233,27 +274,8 @@ class LipschitzBounding:
                 print("error. lipschitz constant hasn't been calculated")
                 raise
             additiveTerm = lipschitzConstants
+        return additiveTerm
 
-        centerPoint = (inputUpperBound + inputLowerBound) / torch.tensor(2., device=self.device)
-        with torch.no_grad():
-            self.startTime(timer, "lowerBound:lipschitzForwardPass")
-            lowerBound = self.network(centerPoint) @ queryCoefficient - additiveTerm
-            self.pauseTime(timer, "lowerBound:lipschitzForwardPass")
-
-            # for batchCounter in range(batchSize):
-            #     import time
-            #     startTime = time.time()
-            #     actualLowerBound = self.milpSolver(inputLowerBound[batchCounter, :].numpy(),
-            #                                        inputUpperBound[batchCounter, :].numpy())
-            #     print("took to run MILP", time.time() - startTime)
-            #     print("**", actualLowerBound, lowerBound[batchCounter], inputLowerBound[batchCounter, :], inputUpperBound[batchCounter, :])
-            #     raise
-            #     if actualLowerBound < lowerBound[batchCounter]:
-            #         print(actualLowerBound, lowerBound[batchCounter])
-            #         raise
-        if virtualBranch and self.performVirtualBranching:
-            lowerBound = torch.maximum(lowerBound, virtualBranchLowerBounds)
-        return lowerBound
 
     @staticmethod
     def startTime(timer, timerName):
