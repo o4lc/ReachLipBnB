@@ -302,7 +302,7 @@ def main():
 if __name__ == '__main__':
     runTimes = []
     numberOfBrancehs = []
-    for i in range(100):
+    for i in range(1):
         t1, t2 = main()
         runTimes.append(t1)
         numberOfBrancehs.append(t2)

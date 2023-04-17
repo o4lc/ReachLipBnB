@@ -32,7 +32,6 @@ class LipschitzBounding:
         self.calculatedLipschitzConstants = calculatedLipschitzConstants
         self.maxSearchDepth = maxSearchDepth
         self.performVirtualBranching = virtualBranching
-        self.extractWeightsForMilp()
         self.normToUse = normToUse
         self.useTwoNormDilation = useTwoNormDilation
         self.useSdpForLipschitzCalculation = useSdpForLipschitzCalculation
@@ -98,17 +97,6 @@ class LipschitzBounding:
             lowerBound = self.network(centerPoint) @ queryCoefficient - additiveTerm
             self.pauseTime(timer, "lowerBound:lipschitzForwardPass")
 
-            # for batchCounter in range(batchSize):
-            #     import time
-            #     startTime = time.time()
-            #     actualLowerBound = self.milpSolver(inputLowerBound[batchCounter, :].numpy(),
-            #                                        inputUpperBound[batchCounter, :].numpy())
-            #     print("took to run MILP", time.time() - startTime)
-            #     print("**", actualLowerBound, lowerBound[batchCounter], inputLowerBound[batchCounter, :], inputUpperBound[batchCounter, :])
-            #     raise
-            #     if actualLowerBound < lowerBound[batchCounter]:
-            #         print(actualLowerBound, lowerBound[batchCounter])
-            #         raise
         if virtualBranch and self.performVirtualBranching:
             lowerBound = torch.maximum(lowerBound, virtualBranchLowerBounds)
         return lowerBound
@@ -325,76 +313,6 @@ class LipschitzBounding:
             elif "bias" in name:
                 biases.append(param.detach().clone().cpu().numpy()[:, np.newaxis])
         return weights, biases
-
-    def extractWeightsForMilp(self):
-        weights = []
-        bs = []
-        for name, param in self.network.named_parameters():
-            if "weight" in name:
-                weights.append(param.detach().clone().cpu().numpy())
-            if "bias" in name:
-                bs.append(param.detach().clone().unsqueeze(1).cpu().numpy())
-
-        self.bs = bs
-        self.Ws = weights
-        self.dimensionList = [w.shape for w in weights]
-
-    @staticmethod
-    def mixedIntegerConstraints(inputVariable, outputVariable, integerVariable,
-                                constraintSet, inputLowerBound, inputUpperBound):
-        constraintSet.append(outputVariable >= 0)
-        constraintSet.append(outputVariable >= inputVariable)
-        constraintSet.append(
-            outputVariable <= inputVariable - cp.multiply(inputLowerBound[np.newaxis].transpose(), 1 - integerVariable))
-        constraintSet.append(outputVariable <= cp.multiply(inputUpperBound[np.newaxis].transpose(), integerVariable))
-        constraintSet.append(integerVariable >= 0)
-        constraintSet.append(integerVariable <= 1)
-
-    def milpSolver(self, l, u):
-        s, t = self.propagateBoundsInNetwork(l, u, self.Ws, self.bs)
-        xs = [cp.Variable((self.dimensionList[0][1], 1))]
-
-        for i in range(1, len(self.dimensionList)):
-            xs.append(cp.Variable((self.dimensionList[i][1], 1)))
-        violatingPlanes = [np.array([[1., 2.]])]
-        violatingObjectiveValues = [0]
-
-        # Define constraints
-        constraints = [xs[0] >= s[0][:, np.newaxis], xs[0] <= t[0][:, np.newaxis]]
-        ########################## place method-specific code here #############################
-        WXPlusBs = [w @ x + b for w, x, b in zip(self.Ws, xs, self.bs)]
-        integerVariables = [cp.Variable((self.dimensionList[i][0], 1), integer=True) for i in range(len(self.dimensionList) - 1)]
-
-        for i in range(len(self.dimensionList) - 1):
-            self.mixedIntegerConstraints(WXPlusBs[i], xs[i + 1], integerVariables[i],
-                                         constraints, s[i + 1], t[i + 1])
-
-        newViolatingPlanes = []
-        newViolatingPlanesCorrect = []
-        for i, (violatingPlane, objectiveValue) in enumerate(zip(violatingPlanes, violatingObjectiveValues)):
-            outputVariableMatrix = self.Ws[-1] @ xs[-1] + self.bs[-1]
-            c = violatingPlane[0]
-            objective = cp.Minimize(c @ outputVariableMatrix)
-            prob = cp.Problem(objective, constraints)
-            try:
-                prob.solve(solver=cp.MOSEK, warm_start=True, verbose=self.sdpSolverVerbose,
-                           mosek_params={
-                               "MSK_DPAR_MIO_REL_GAP_CONST": 1e-15,
-                               "MSK_DPAR_MIO_TOL_ABS_RELAX_INT": 1e-9,
-                               "MSK_DPAR_MIO_TOL_FEAS": 1e-9,
-                               "MSK_DPAR_MIO_TOL_REL_GAP": 0,
-                           }
-                           )
-            except:
-                print(prob.status, end='\n\n')
-                continue
-            difference = abs(objectiveValue - objective.value)
-            relative = abs(difference / objective.value)
-            if relative < 1e-3:
-                continue
-            # print(objective.value)
-
-        return objective.value
 
     @staticmethod
     def calculateBoundsAfterLinearTransformation(weight, bias, lowerBound, upperBound):
