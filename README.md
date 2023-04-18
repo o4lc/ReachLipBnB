@@ -2,6 +2,7 @@
 
 This repository constains the code for [ReachLipBnB](https://arxiv.org/abs/2211.00608). 
 This framework is a branch and bound based method for neural network reachability analysis introduced by Taha Entesari, Sina Sharifi and Mahyar Fazlyab.
+This work will be presented at ICRA 2023.
 
 # Installation Requirements
 ```
