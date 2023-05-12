@@ -260,20 +260,16 @@ def main():
         if "doubleintegrator" in configFileToLoad.lower():
             reachlp = np.array([
                 # [[2.5, 3], [-0.25, 0.25]],
-            [[ 1.90837383, 2.75 ],
-            [-1.125, -0.70422709]],
-
-            [[1.0081799, 1.8305043],
-            [-1.10589671, -0.80364925]],
-
-            [[ 0.33328745,  0.94537741],
-            [-0.76938218, -0.41314635]],
-
-            [[-0.06750171, 0.46302059],
-            [-0.47266394, -0.07047667]],
-
-            [[-0.32873616,  0.38155359],
-            [-0.30535603,  0.09282264]]
+                [[2.01483464,  3.00026107],
+                 [-0.72033036, - 0.24947783]],
+            [[1.24562085,  2.51569748],
+               [-0.90323961, - 0.70318079]],
+            [[0.5206694 ,  1.71032166],
+               [-0.91515499, - 0.58238333]],
+            [[0.02371979,  0.90817016],
+               [-0.74536365, - 0.25939932]],
+            [[-0.22359109 , 0.3695122],
+               [-0.46331555, - 0.02226254]]
             ])
             plottingData["reachlp"] = reachlp
             for i in range(min(finalHorizon, len(reachlp))):
@@ -295,7 +291,7 @@ def main():
 
     print('The algorithm took (s):', endTime - startTime, 'with eps =', eps)
     print("Total number of branches: {}".format(totalNumberOfBranches))
-    torch.save(plottingData, "Output/reachLip" + fileName)
+    torch.save(plottingData, "Output/reachLip" + fileName + ".pth")
     return endTime - startTime, totalNumberOfBranches
 
 
